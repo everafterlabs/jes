@@ -1,0 +1,6 @@
+Unicode Data Files are under the Unicode License, version 3.0.
+Copyright © Unicode, Inc. All rights reserved.
+
+Copies of Default_Ignorable_Code_Point, Bidi_Control, standardized and
+emoji variation sequences, and TR39 confusables data are vendored in this
+package. See https://www.unicode.org/license.txt for the full terms.

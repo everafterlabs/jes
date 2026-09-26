@@ -1,0 +1,12 @@
+{
+  "answers": {
+    "contract": {
+      "score": 0.12,
+      "confidence": 0.91
+    }
+  },
+  "usage": {
+    "input_tokens": 40,
+    "output_tokens": 8
+  }
+}

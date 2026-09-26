@@ -1,0 +1,10 @@
+{
+  "answers": {
+    "check.violation": {"score": 0.05, "confidence": 0.88},
+    "topic.violation": {
+      "scores": {"safe": 0.9, "unsafe": 0.1},
+      "confidence": 0.8
+    }
+  },
+  "usage": {"input_tokens": 80, "output_tokens": 12}
+}

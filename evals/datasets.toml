@@ -1,0 +1,102 @@
+# Pinned sources. review = "accepted" is required before a row is loaded.
+# CI does not read these URLs. Raw text is never committed.
+#
+# Reviewed 2026-09-26 from the upstream LICENSE files at the pinned revisions.
+# The development cohort was sent to TypeSafe. Its ids are burned.
+# The holdout fifth and the BIPIA test files are reserved and were not sent.
+# Audit is not opened. Ranking waits for a second finalist.
+
+[lock]
+audit_opened = false
+id_list = "evals/split_lock.json"
+id_sha256 = "16e76cc5245e11f16c00264420fbf79e43bd4d7c814d07f4efd58be45a9fbb95"
+second_finalist = "unranked"
+
+[[dataset]]
+id = "xstest-prompts"
+role = "benign-and-contrast"
+url = "https://github.com/paul-rottger/xstest"
+license = "CC-BY-4.0 for xstest_prompts.csv. Model completions stay under Meta, Mistral, and OpenAI terms and are not loaded."
+revision = "d7bb5bd738c1fcbc36edd83d5e7d1b71a3e2d84d"
+hosted_processing = "typesafe-development"
+retention = "local checkout under evals/cache; attribute Röttger et al., NAACL 2024"
+review = "accepted"
+scoring = "development-closed"
+notes = "Prompts only. 353 development ids were sent and are burned. 97 holdout ids are reserved in evals/split_lock.json. Unsafe rows are hazard contrasts, not injection gold."
+splits = ["development"]
+
+[[dataset]]
+id = "bipia-table"
+role = "indirect-injection"
+url = "https://github.com/microsoft/BIPIA"
+license = "WikiTableQuestions CC-BY-SA-4.0. Repository code is MIT and does not cover this data."
+revision = "a004b69ec0dd446e0afd461d98cb5e96e120a5d0"
+hosted_processing = "typesafe-development"
+retention = "local checkout under evals/cache; keep the ShareAlike notice with any redistribution"
+review = "accepted"
+scoring = "development-closed"
+notes = "722 train ids were sent and are burned. 178 train ids and all 100 test ids are reserved. Test attacks were not loaded."
+splits = ["development"]
+
+[[dataset]]
+id = "bipia-code"
+role = "indirect-injection"
+url = "https://github.com/microsoft/BIPIA"
+license = "Stack Exchange answers CC-BY-SA-4.0. Author URLs are in the jsonl. Repository code is MIT and does not cover this data."
+revision = "a004b69ec0dd446e0afd461d98cb5e96e120a5d0"
+hosted_processing = "typesafe-development"
+retention = "local checkout under evals/cache; keep author URLs and the ShareAlike notice with any redistribution"
+review = "accepted"
+scoring = "development-closed"
+notes = "38 train ids were sent and are burned. 12 train ids and all 50 test ids are reserved. Test attacks were not loaded."
+splits = ["development"]
+
+[[dataset]]
+id = "bipia-external"
+role = "indirect-injection"
+url = "https://github.com/microsoft/BIPIA"
+license = "Email is not named in the repository dataset license list. WebQA and summarization contexts are not in the repo."
+revision = "a004b69ec0dd446e0afd461d98cb5e96e120a5d0"
+hosted_processing = "forbidden"
+retention = "do not download NewsQA or XSum for this run"
+review = "pending"
+notes = "Email, WebQA, and summarization are excluded."
+splits = ["development"]
+
+[[dataset]]
+id = "dolly-15k"
+role = "benign"
+url = "https://huggingface.co/datasets/databricks/databricks-dolly-15k"
+license = "CC-BY-SA-3.0. README states any academic or commercial use under that license. Wikipedia excerpts in the context field are CC-BY-SA-3.0. The Dolly code repository is Apache-2.0 and does not license this data."
+revision = "bdd27f4d94b9c1f951818a7da7fd7aeea5dbff1a"
+hosted_processing = "not-sent"
+retention = "do not commit raw text; keep the ShareAlike notice with any redistribution"
+review = "accepted"
+scoring = "refused-until-split-assigned"
+notes = "Pinned benign source for a later selection split. No row has been downloaded or sent. Assign selection and audit ids before scoring, and leave the audit ids unsent."
+splits = ["unassigned"]
+
+[[dataset]]
+id = "s-labs-prompt-injection"
+role = "direct-injection"
+url = "https://huggingface.co/datasets/S-Labs/prompt-injection-dataset"
+license = "README heading says MIT License. The repository has no LICENSE file and no copyright line."
+revision = "002a9dd18514abd021869823d6b0429b38606d99"
+hosted_processing = "forbidden"
+retention = "do not download until a license file is present"
+review = "pending"
+scoring = "refused-until-license"
+notes = "Card lists 11089 train, 2101 validation, and 2101 test rows. Not cleared. The published test split stays unsent."
+splits = ["unassigned"]
+
+[[dataset]]
+id = "synthetic-smoke"
+role = "plumbing"
+url = ""
+license = "Apache-2.0"
+revision = "in-repo"
+hosted_processing = "local-only"
+retention = "none"
+review = "pending"
+notes = "Fake-backend plumbing only. Not an evaluation dataset."
+splits = ["development"]
