@@ -27,6 +27,7 @@ class CallContext:
     target: ContextTarget
     redactions: RedactionView | None
     deadline: float | None
+    tool: str | None = None
 
 
 @dataclass(frozen=True, slots=True, repr=False)

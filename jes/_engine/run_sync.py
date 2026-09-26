@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from jes.backends import RequestContext, SyncBackend
 from jes.errors import BackendError, DeadlineExceeded, PolicyError, PolicyExecutionError
@@ -11,7 +11,15 @@ from jes.policies import Policy
 from jes.redactions import Redactions
 from jes.types import Finding, History, InputResult, ScanResult, Stage
 
-from .core import BaseGuard, CheckPlan, ContextValue, OnBackendError, RequestExecution
+from .core import (
+    BaseGuard,
+    CheckPlan,
+    ContextValue,
+    OnBackendError,
+    RequestExecution,
+    freeze_arguments,
+    require_tool_name,
+)
 from .limits import GuardLimits, ResourceLimit
 
 
@@ -141,6 +149,38 @@ class Guard(BaseGuard):
             history=history,
         )
 
+    def check_tool_call(
+        self,
+        name: str,
+        arguments: str | Mapping[str, object],
+        *,
+        prompt: str | InputResult,
+        redactions: Redactions | None = None,
+    ) -> ScanResult:
+        return self._check(
+            stage="tool_call",
+            text=freeze_arguments(arguments),
+            redactions=redactions,
+            prompt=prompt,
+            tool=require_tool_name(name),
+        )
+
+    def check_tool_result(
+        self,
+        text: str,
+        *,
+        name: str,
+        prompt: str | InputResult | None = None,
+        redactions: Redactions | None = None,
+    ) -> ScanResult:
+        return self._check(
+            stage="tool_result",
+            text=text,
+            redactions=redactions,
+            question=prompt,
+            tool=require_tool_name(name),
+        )
+
     def _check(
         self,
         *,
@@ -151,6 +191,7 @@ class Guard(BaseGuard):
         question: str | InputResult | None = None,
         sources: Sequence[str | ScanResult] = (),
         history: Sequence[History] = (),
+        tool: str | None = None,
     ) -> ScanResult:
         deadline = self._deadline()
         primary: ContextValue | None = prompt if prompt is not None else question
@@ -165,6 +206,7 @@ class Guard(BaseGuard):
                     question=question,
                     sources=sources,
                     history=history,
+                    tool=tool,
                     deadline=deadline,
                 )
                 try:

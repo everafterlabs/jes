@@ -34,7 +34,7 @@ PiiUntrustedMode = Literal["mask", "redact", "block"]
 PiiOutputMode = Literal["flag", "redact", "block"]
 UrlMode = Literal["block", "allow"]
 
-_ALL_STAGES: tuple[Stage, ...] = ("input", "untrusted", "output")
+_ALL_STAGES: tuple[Stage, ...] = ("input", "untrusted", "tool_call", "tool_result", "output")
 _DEFAULT_ENTITIES = (
     "CREDIT_CARD",
     "CRYPTO",
@@ -164,6 +164,8 @@ def _mode_for(
     output_mode: PiiOutputMode,
     restore: bool,
 ) -> tuple[_SensitiveMode, Action]:
+    if stage == "tool_result":
+        stage = "untrusted"
     if stage == "output":
         if output_mode == "flag":
             return "output_local", "flag"
@@ -220,6 +222,11 @@ class _Pii:
         merged = _merge_hits(hits)
         if not merged:
             return _SensitiveOutcome(())
+        if call.origin_stage == "tool_call":
+            return _SensitiveOutcome(
+                (),
+                tuple(TransformFinding(entity, "block", (span,)) for span, entity in merged),
+            )
         mode, action = _mode_for(
             stage=call.origin_stage,
             input_mode=self.input_mode,

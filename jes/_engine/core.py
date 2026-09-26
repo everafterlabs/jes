@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import secrets
 import time
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Literal, TypeAlias
+from typing import Literal, TypeAlias, cast
 
 from jes.backends import (
     Backend,
@@ -35,6 +36,7 @@ from jes.types import (
     InputResult,
     Message,
     Provenance,
+    Role,
     SanitizationStamp,
     ScanResult,
     ScoreResult,
@@ -78,6 +80,75 @@ OnBackendError: TypeAlias = Literal["raise", "block", "allow"]
 ContextValue: TypeAlias = str | ScanResult
 
 
+def _history_projection(entry: History) -> tuple[Role, Stage, ContextValue]:
+    """Map a history entry to the role and origin stage used for context."""
+
+    if isinstance(entry, Message):
+        if entry.role == "user":
+            return "user", "input", entry.text
+        if entry.role == "tool":
+            return "tool", "tool_result", entry.text
+        return "assistant", "output", entry.text
+    if entry.stage == "input":
+        return "user", "input", entry
+    if entry.stage == "tool_result":
+        return "tool", "tool_result", entry
+    return "assistant", "output", entry
+
+
+def require_tool_name(name: str) -> str:
+    if not name or len(name) > 256 or name.strip() != name or any(ord(char) < 32 for char in name):
+        raise PolicyError("tool name must be a non-empty single-line string")
+    return name
+
+
+def _require_json(value: object) -> None:
+    if value is None or isinstance(value, (str, bool, int)):
+        return
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise PolicyError("tool arguments must be JSON values")
+        return
+    if isinstance(value, Mapping):
+        items = cast(Mapping[object, object], value)
+        for key, item in items.items():
+            if not isinstance(key, str):
+                raise PolicyError("tool arguments must be JSON values")
+            _require_json(item)
+        return
+    if isinstance(value, list):
+        elements = cast(list[object], value)
+        for item in elements:
+            _require_json(item)
+        return
+    raise PolicyError("tool arguments must be JSON values")
+
+
+def _plain_json(value: object) -> object:
+    if isinstance(value, Mapping):
+        items = cast(Mapping[str, object], value)
+        return {key: _plain_json(item) for key, item in items.items()}
+    if isinstance(value, list):
+        elements = cast(list[object], value)
+        return [_plain_json(item) for item in elements]
+    return value
+
+
+def freeze_arguments(arguments: str | Mapping[str, object]) -> str:
+    """Keep a string subject, or serialize a mapping one canonical way."""
+
+    if isinstance(arguments, str):
+        return arguments
+    _require_json(arguments)
+    return json.dumps(
+        _plain_json(arguments),
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+        allow_nan=False,
+    )
+
+
 @dataclass(slots=True)
 class PreparedCheck:
     stage: Stage
@@ -92,6 +163,7 @@ class PreparedCheck:
     manifest: _TokenAuthorityManifest
     finalizers: FinalizerMap
     generation_tokens: frozenset[str]
+    tool: str | None = None
 
 
 @dataclass(slots=True)
@@ -225,7 +297,7 @@ class BaseGuard:
         deadline: float | None,
         target: Literal["prompt", "question", "source", "history"],
         index: int | None = None,
-        role: Literal["user", "assistant"] | None = None,
+        role: Role | None = None,
         session: TransformSession | None = None,
     ) -> tuple[str, tuple[Finding, ...]]:
         if isinstance(value, ScanResult):
@@ -359,14 +431,7 @@ class BaseGuard:
 
         sanitized_history: list[Message] = []
         for index, entry in enumerate(history):
-            if isinstance(entry, Message):
-                role = entry.role
-                value: ContextValue = entry.text
-                origin_stage: Stage = "input" if role == "user" else "output"
-            else:
-                role = "user" if entry.stage == "input" else "assistant"
-                value = entry
-                origin_stage = "input" if role == "user" else "output"
+            role, origin_stage, value = _history_projection(entry)
             text, current = self._sanitize_context_value(
                 value,
                 call_stage=stage,
@@ -401,6 +466,7 @@ class BaseGuard:
         sources: Sequence[str | ScanResult] = (),
         history: Sequence[History] = (),
         deadline: float | None,
+        tool: str | None = None,
     ) -> PreparedCheck:
         started = time.perf_counter()
         primary: ContextValue | None = prompt if prompt is not None else question
@@ -411,7 +477,7 @@ class BaseGuard:
             tracked_tokens=set(),
             authorities=[],
             finalizers=FinalizerMap(),
-            allow_conversation_token=stage != "output",
+            allow_conversation_token=stage not in {"output", "tool_call"},
             allow_output_local=stage == "output",
         )
         try:
@@ -436,7 +502,9 @@ class BaseGuard:
                 limits=self._limits,
                 location_target="subject",
                 run_limit_phase=True,
-                neutralize=stage != "output",
+                neutralize=stage not in {"output", "tool_call"},
+                rewrite_placeholders=stage != "tool_call",
+                tool=tool,
                 session=session,
             )
             try:
@@ -461,6 +529,7 @@ class BaseGuard:
             manifest=make_manifest(transformed.authorities),
             finalizers=session.finalizers,
             generation_tokens=frozenset(session.tracked_tokens),
+            tool=tool,
         )
 
     def _fit_context(
@@ -477,8 +546,8 @@ class BaseGuard:
         if mode == "none":
             return empty
 
-        primary_prompt = contexts.prompt if stage == "output" else None
-        primary_question = contexts.question if stage == "untrusted" else None
+        primary_prompt = contexts.prompt if stage in {"output", "tool_call"} else None
+        primary_question = contexts.question if stage in {"untrusted", "tool_result"} else None
         source_values = contexts.sources if include_sources else ()
         if mode == "required":
             candidate = State(
@@ -601,6 +670,8 @@ class BaseGuard:
                         )
                     complete = False
                     continue
+                if prepared.tool is not None:
+                    base_state = replace(base_state, tool=prepared.tool)
                 try:
                     chunks = chunk_text(
                         backend=backend,
@@ -723,6 +794,8 @@ class BaseGuard:
                 )
                 complete = False
                 continue
+            if prepared.tool is not None:
+                base_state = replace(base_state, tool=prepared.tool)
             profile = self._request_profile(compiled, prepared.stage)
             for item_ordinal, item in enumerate(extracted):
                 if (

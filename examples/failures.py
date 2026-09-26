@@ -33,4 +33,6 @@ def main() -> tuple[str, InputResult, InputResult, InputResult]:
         backend=FakeBackend(answers={}),
         max_input_bytes=4,
     ).check_input("too long for the cap")
+    # opened.decision is allow, but opened.onward is the refusal.
+    # limited.onward names input_too_long and does not include the text.
     return raised, blocked, opened, limited

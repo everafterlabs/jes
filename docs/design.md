@@ -35,7 +35,7 @@ These hold for v1 unless this document is revised.
 
 1. **Python 3.11+.** The core depends only on `httpx`. No torch in the core.
 2. **Apache-2.0.** Meta weights are never shipped. Local Meta adapters download them under the user’s Hugging Face account.
-3. **One pipeline, three entry points:** `check_input`, `check_untrusted`, `check_output`. `Guard` and `AsyncGuard` share all planning and interpretation code; only request execution differs.
+3. **One pipeline, five entry points:** `check_input`, `check_untrusted`, `check_output`, `check_tool_call`, and `check_tool_result`. `Guard` and `AsyncGuard` share all planning and interpretation code; only request execution differs.
 4. **Two policy kinds.** Transforms (exact rules and span edits) and judgments (questions for a backend). All transforms run before any judgment, in fixed phases (normalize, detect, limit). Checked text and every context value get a backend-safe projection; a context block that leaves sensitive text in place prevents backend I/O.
 5. **Backends are peers** behind one protocol: System One (Laya, Jev), LiteLLM, Prompt Guard 2, Llama Guard 4. Each backend declares which tasks it can answer.
 6. **Recommendations and defaults are measured.** No backend is recommended and no threshold is a default until evaluation measures the exact request and per-policy decision profiles. A decision configuration that differs from an evaluated profile needs an explicit threshold.
@@ -59,7 +59,7 @@ These hold for v1 unless this document is revised.
 - Decoding obfuscated payloads (base64, ROT13, and similar) in v1.
 - Detecting attacks spread across several turns in v1. History can be passed to backends as context; no policy targets multi-turn attacks yet.
 - Judging or restoring partial replies while they stream in v1. Applications buffer the complete reply before `check_output`; incremental transform/finalizer support is a post-1.0 candidate.
-- Restoring PII into tool-call arguments in v1. Applications authorize and populate tool arguments themselves.
+- Restoring PII into tool-call arguments. `check_tool_call` scans the argument string and does not write values back into it. Applications authorize and populate tool arguments themselves.
 - Automatic restoration into Markdown, HTML, JSON, shell text, or another structured sink in v1. jes restores plain text; the application escapes restored values for its renderer.
 - Fetching URLs found in text.
 - A hosted SaaS.
@@ -109,6 +109,8 @@ jes does not guarantee that any judgment is correct. 1.0 does not publish detect
 check_input(text, redactions=None, history=())                        → InputResult
 check_untrusted(text, question=None, redactions=None)                 → ScanResult
 check_output(text, prompt, sources=(), redactions=None, history=())   → ScanResult
+check_tool_call(name, arguments, prompt, redactions=None)             → ScanResult
+check_tool_result(text, name, prompt=None, redactions=None)          → ScanResult
               │
               ▼
 1. transforms                    normalize → detect → limit; list order within a phase
@@ -225,7 +227,7 @@ show(outgoing.text)
 history += [incoming, outgoing]
 ```
 
-Applications buffer model output until `check_output` returns. Restoration produces plain text only. jes does not restore tool-call arguments; the application parses, authorizes, and populates tool inputs itself.
+Applications buffer model output until `check_output` returns. Restoration produces plain text only. `check_tool_call` scans a model's tool name and argument string before the application runs the tool, and `check_tool_result` scans the tool's response before it goes back to the model. jes does not restore tool-call arguments; the application parses, authorizes, and populates tool inputs itself.
 
 ```python
 Guard(
@@ -285,6 +287,24 @@ class AsyncGuard:
         redactions: Redactions | None = None,
         history: Sequence[History] = (),
     ) -> ScanResult: ...
+
+    async def check_tool_call(
+        self,
+        name: str,
+        arguments: str | Mapping[str, object],
+        *,
+        prompt: str | InputResult,
+        redactions: Redactions | None = None,
+    ) -> ScanResult: ...
+
+    async def check_tool_result(
+        self,
+        text: str,
+        *,
+        name: str,
+        prompt: str | InputResult | None = None,
+        redactions: Redactions | None = None,
+    ) -> ScanResult: ...
 ```
 
 `History = InputResult | ScanResult | Message`. `Guard` exposes the same signatures without `async`.
@@ -294,12 +314,14 @@ class AsyncGuard:
 | `check_input(text, *, redactions=None, history=())` | `input` | Earlier turns |
 | `check_untrusted(text, *, question=None, redactions=None)` | `untrusted` | The user question the text was retrieved for |
 | `check_output(text, *, prompt, sources=(), redactions=None, history=())` | `output` | The prompt, retrieved sources, and earlier turns |
+| `check_tool_call(name, arguments, *, prompt, redactions=None)` | `tool_call` | The user turn in `prompt`. `arguments` may be a string or a mapping. The tool name is sent with judgments. Arguments are not restored. `onward` is safe to pass on. |
+| `check_tool_result(text, *, name, prompt=None, redactions=None)` | `tool_result` | The same user turn, stored as the retrieval question. `onward` is the redacted text when the check is ok, and a refusal otherwise. |
 
-- `redactions` is the conversation’s store (section 7.6). Without one, `check_input` creates a fresh store and keeps it on the result, which is enough for a single turn. `check_untrusted` and `check_output` derive the store from an `InputResult` question or prompt when possible. An explicit store whose identity differs from that result raises `RedactionError`; jes never silently picks one.
+- `redactions` is the conversation’s store (section 7.6). Without one, `check_input` creates a fresh store and keeps it on the result, which is enough for a single turn. The other checks derive the store from an `InputResult` question or prompt when possible. An explicit store whose identity differs from that result raises `RedactionError`; jes never silently picks one.
 - Context is sanitized before any backend sees it. `prompt`, `question`, `sources`, and `history` accept jes results or raw strings (`Message(role, text)` in history). A result fast path requires `ok=True` plus a verified stamp, exact text/findings/authority digests, stage, configuration, and store/scope identity. A blocked or incomplete result produces blocking `context_not_ok`. A failed stamp is treated as raw untrusted text: reserved token syntax is neutralized, authority is discarded, and current transforms run again.
 - Raw context strings and input/untrusted subjects are untrusted: reserved placeholder syntax is neutralized before transforms. A raw output subject is the one exception because an application model must be able to return an authorized context token; its token-shaped substrings are preserved for exact validation and unauthorized ones never restore. Context transforms run for their origin stage: `untrusted` for sources, `input` for user questions and user history, and `output` for assistant history. A context block propagates to the check; it is never discarded while unrevised text continues to a backend.
 - When a raw input-origin context needs reversible PII redaction, it may stage tokens for the matching conversation store. Without a store, jes uses irreversible masks. Output-origin context (for example raw assistant history) is always irreversibly masked for backend projection; it neither creates output-local edits nor adds caller-visible restoration authority.
-- `history` lists earlier turns, oldest first: `InputResult`s, output `ScanResult`s, or `Message`s with role `"user"` or `"assistant"`.
+- `history` lists earlier turns, oldest first: `InputResult`s, output `ScanResult`s, `tool_result` `ScanResult`s, or `Message`s with role `"user"`, `"assistant"`, or `"tool"`. A tool message is projected as a tool result, not as an assistant reply.
 - `check_output.text` must be the complete model reply in one call. jes cannot infer whether an arbitrary `str` is a prefix; chunk-by-chunk calls are outside output restoration guarantees.
 - `check_output` is the only restoration entry point in v1. It restores complete plain-text model replies after output transforms and judgments. There is no generic or incremental restoration API.
 - `deadline_s` is a per-check duration. At method entry jes computes `time.monotonic() + deadline_s` and passes that absolute deadline to backends and transforms. Transport, retry-wait, permit, cooperative CPU, and `AsyncGuard` wait expiry all become `DeadlineExceeded`, a `BackendError` that follows `on_backend_error`. Hard resource caps are not backend errors and always block. Python cannot forcibly stop a synchronous custom callback or third-party CPU call such as an in-flight Presidio analysis; it may finish in a bounded worker after `AsyncGuard` has discarded it. `Guard` can overrun wall time and applies the same deadline outcome when the call returns.
@@ -1200,12 +1222,13 @@ Before I/O, the planner reserves deterministic attempt slots for each finalized 
 
 | Policy | Default stages | Behavior |
 | --- | --- | --- |
-| `invisible_text(mode="targeted", block=False)` | All | See below. Finding `redact` when anything was removed; `block=True` blocks instead. |
-| `regex(patterns, action="block", match="search", require=False, fold=False, timeout_ms=50)` | All | Caller patterns through the timeout-capable `regex` package (extra `[regex]`). `match="search"` looks anywhere; `"fullmatch"` needs the whole text. `action` is `block` or `redact`; with `require=True`, text matching none of the patterns is blocked. |
-| `substrings(terms, action="block", whole_words=False, fold=True)` | All | Matches on a folded copy, so lookalike letters and hidden characters cannot split a banned term. |
+| `invisible_text(mode="targeted", block=False)` | input, untrusted, tool_result, output | See below. Finding `redact` when anything was removed; `block=True` blocks instead. |
+| `regex(patterns, action="block", match="search", require=False, fold=False, timeout_ms=50)` | input, untrusted, tool_result, output | Caller patterns through the timeout-capable `regex` package (extra `[regex]`). `match="search"` looks anywhere; `"fullmatch"` needs the whole text. `action` is `block` or `redact`; with `require=True`, text matching none of the patterns is blocked. |
+| `substrings(terms, action="block", whole_words=False, fold=True)` | input, untrusted, tool_result, output | Matches on a folded copy, so lookalike letters and hidden characters cannot split a banned term. |
 | `token_limit(limit, encoding="cl100k_base", mode="block")` | Input | tiktoken count. `mode="truncate"` cuts to the limit and flags. Extra `[tokens]`. |
-| `secrets(redact="all", key=None)` | All | detect-secrets plus a documented set of high-value token patterns; see below. `all` → `******`; `partial` → first two and last two characters; `hmac` → HMAC-SHA256 hex under `key`, which that mode requires. A plain hash would let anyone confirm a guessed secret. Extra `[secrets]`. |
-| `pii(...)` | All | Presidio; see below. Extra `[pii]`. |
+| `secrets(redact="all", key=None)` | input, untrusted, tool_call, tool_result, output | detect-secrets plus a documented set of high-value token patterns; see below. `all` → `******`; `partial` → first two and last two characters; `hmac` → HMAC-SHA256 hex under `key`, which that mode requires. A plain hash would let anyone confirm a guessed secret. On `tool_call`, a secret blocks and the argument string is left intact. Extra `[secrets]`. |
+| `pii(...)` | input, untrusted, tool_call, tool_result, output | Presidio; see below. Extra `[pii]`. On `tool_call`, a finding blocks and the argument string is left intact. `tool_result` uses `untrusted_mode`. |
+| `allowed_tools(names)` | tool_call | Blocks when the tool name is outside `names`. The argument string is not edited. Omitting the policy does not authorize a tool. |
 | `canary(token)` | Output | Jes-owned sensitive transform: irreversibly removes and blocks a canary token leaked from an application system prompt. |
 
 **`invisible_text`.** `"targeted"` mode removes the characters attacks use, taken from Unicode properties rather than a hand-written list:
@@ -1243,8 +1266,8 @@ Natural-language PII recognition uses an NFKC copy because named-entity recognit
 
 | Policy | Default stages | Context | Questions | Task |
 | --- | --- | --- | --- | --- |
-| `injection()` | Input, untrusted | None | One yes/no question: the text tries to override, ignore, or reveal an AI assistant’s instructions, or to make it abandon its rules | `injection` |
-| `indirect_injection()` | Untrusted | Optional (the question) | One yes/no question: the text contains instructions addressed to an AI assistant rather than information for a reader | `indirect_injection` |
+| `injection()` | Input, untrusted, tool_call | None | One yes/no question: the text tries to override, ignore, or reveal an AI assistant’s instructions, or to make it abandon its rules | `injection` |
+| `indirect_injection()` | Untrusted, tool_result | Optional (the question) | One yes/no question: the text contains instructions addressed to an AI assistant rather than information for a reader | `indirect_injection` |
 | `hazards(categories=None)` | Input, output | Optional (prompt, history) | One yes/no question per category, S1–S14, plus `hazard.any` on backends that list it in `tasks` | `hazard.S<n>`, `hazard.any` |
 | `topics(deny, threshold=...)` | Input, output | None | One yes/no question per denied topic | `topic` |
 | `toxicity(labels=None)` | Input, output | None | One yes/no question per label: toxicity, severe toxicity, obscene, threat, insult, identity attack, sexual explicit | `toxicity.<label>` |

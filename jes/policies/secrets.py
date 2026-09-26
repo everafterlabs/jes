@@ -24,7 +24,7 @@ from jes.redactions import RedactionTransaction
 from jes.types import Span, Stage
 
 SecretRedact = Literal["all", "partial", "hmac"]
-_ALL_STAGES: tuple[Stage, ...] = ("input", "untrusted", "output")
+_ALL_STAGES: tuple[Stage, ...] = ("input", "untrusted", "tool_call", "tool_result", "output")
 _LOCK = threading.Lock()
 _configured: str | None = None
 
@@ -125,7 +125,7 @@ class _Secrets:
         call: CallContext,
         transaction: RedactionTransaction,
     ) -> _SensitiveOutcome:
-        del call, transaction
+        del transaction
         mapped = machine_identifier(text)
         hits = [*_pattern_hits(mapped.text), *_plugin_hits(mapped.text)]
         mapped_hits = [
@@ -134,6 +134,8 @@ class _Secrets:
         spans = _merge(mapped_hits)
         if not spans:
             return _SensitiveOutcome(())
+        if call.origin_stage == "tool_call":
+            return _SensitiveOutcome((), (TransformFinding("secret", "block", spans),))
         edits = tuple(_SensitiveEdit(span, "secret", self.mode, "redact") for span in spans)
         return _SensitiveOutcome(edits, (TransformFinding("secret", "redact", spans),))
 

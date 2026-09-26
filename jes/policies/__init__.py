@@ -29,6 +29,7 @@ from jes.policies.pii import pii
 from jes.policies.secrets import secrets
 from jes.policies.transforms import (
     EXPLOIT_TERMS,
+    allowed_tools,
     canary,
     invisible_text,
     regex,
@@ -53,6 +54,7 @@ __all__ = [
     "TransformFinding",
     "TransformOutcome",
     "TransformPolicy",
+    "allowed_tools",
     "canary",
     "hazards",
     "indirect_injection",

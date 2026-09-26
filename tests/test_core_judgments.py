@@ -39,6 +39,8 @@ def _fingerprints(guard: Guard, backend: FakeBackend) -> set[str]:
         guard.check_input("boundary"),
         guard.check_untrusted("boundary"),
         guard.check_output("boundary", prompt="prompt"),
+        guard.check_tool_call("search", "boundary", prompt="prompt"),
+        guard.check_tool_result("boundary", name="search"),
     ):
         for score in result.scores.values():
             assert isinstance(score, ScoreResult)

@@ -86,7 +86,14 @@ class FakeRequestBudget:
 
 
 class FakeBackend:
-    """A deterministic backend that records every state and question batch."""
+    """A deterministic backend that records every state and question batch.
+
+    An answer registered under a namespaced id such as ``injection.violation``
+    is used before an answer registered under the bare local id ``violation``.
+    ``default_answer`` fills any question that still has no registered id.
+    ``None`` leaves that question as ``missing_fake_answer``.
+    A key such as ``output:S1`` is used on that stage before the bare ``S1``.
+    """
 
     name = "fake"
 
@@ -102,6 +109,7 @@ class FakeBackend:
         score_kinds: Mapping[str, frozenset[ScoreKind]] | None = None,
         delay_s: float = 0.0,
         model: str = "fake@1",
+        default_answer: Answer | None = None,
     ) -> None:
         self.capabilities = BackendCapabilities(
             tasks=tasks,
@@ -131,6 +139,7 @@ class FakeBackend:
             dependency_versions={},
         )
         self._answers = dict(answers or {})
+        self._default_answer = default_answer
         self._max_units = max_units
         self._delay_s = delay_s
         self._lock = threading.Lock()
@@ -141,17 +150,20 @@ class FakeBackend:
 
     @staticmethod
     def render(state: State, questions: Mapping[str, Question]) -> str:
+        state_payload: dict[str, object] = {
+            "stage": state.stage,
+            "text": state.text,
+            "prompt": state.prompt,
+            "question": state.question,
+            "sources": state.sources,
+            "history": [
+                {"role": message.role, "text": message.text} for message in state.history
+            ],
+        }
+        if state.tool is not None:
+            state_payload["tool"] = state.tool
         payload = {
-            "state": {
-                "stage": state.stage,
-                "text": state.text,
-                "prompt": state.prompt,
-                "question": state.question,
-                "sources": state.sources,
-                "history": [
-                    {"role": message.role, "text": message.text} for message in state.history
-                ],
-            },
+            "state": state_payload,
             "questions": {
                 key: {
                     "type": type(question).__name__,
@@ -189,14 +201,21 @@ class FakeBackend:
         selected: dict[str, Answer] = {}
         missing: set[str] = set()
         for question_id in questions:
-            if question_id in self._answers:
-                selected[question_id] = self._answers[question_id]
-                continue
             local = question_id.rsplit(".", 1)[-1]
-            if local in self._answers:
+            staged = f"{state.stage}:{question_id}"
+            staged_local = f"{state.stage}:{local}"
+            if staged in self._answers:
+                selected[question_id] = self._answers[staged]
+            elif question_id in self._answers:
+                selected[question_id] = self._answers[question_id]
+            elif staged_local in self._answers:
+                selected[question_id] = self._answers[staged_local]
+            elif local in self._answers:
                 selected[question_id] = self._answers[local]
-                continue
-            missing.add(question_id)
+            elif self._default_answer is not None:
+                selected[question_id] = self._default_answer
+            else:
+                missing.add(question_id)
         if missing:
             raise BackendError(self.name, "missing_fake_answer", question_ids=missing)
         with self._lock:

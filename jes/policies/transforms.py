@@ -36,7 +36,8 @@ from jes.redactions import RedactionTransaction
 from jes.types import Action, Span, Stage
 
 _REDACTED = "[REDACTED]"
-_ALL_STAGES: tuple[Stage, ...] = ("input", "untrusted", "output")
+# tool_call is omitted: rewriting an argument string would break the JSON the app executes.
+_ALL_STAGES: tuple[Stage, ...] = ("input", "untrusted", "tool_result", "output")
 RegexMatch = Literal["search", "fullmatch"]
 InvisibleMode = Literal["targeted", "all"]
 TokenMode = Literal["block", "truncate"]
@@ -514,6 +515,52 @@ class _Canary:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class _AllowedTools:
+    name: str
+    labels: frozenset[str]
+    stages: frozenset[Stage]
+    phase: Phase
+    fingerprint: str
+    names: frozenset[str]
+
+    def apply(self, text: str, call: CallContext) -> TransformOutcome:
+        if call.tool in self.names:
+            return TransformOutcome(text=text)
+        return TransformOutcome(
+            text=text,
+            findings=(TransformFinding("tool_name", "block"),),
+        )
+
+
+def allowed_tools(names: Iterable[str], *, name: str = "allowed_tools") -> _AllowedTools:
+    """Block a tool call whose name is outside this set. Arguments are not edited."""
+
+    values = tuple(names)
+    if not values or any(_invalid_tool_name(item) for item in values):
+        raise PolicyError("allowed_tools requires non-empty single-line names")
+    validate_identifier(name, field="policy name")
+    frozen = frozenset(values)
+    return _AllowedTools(
+        name=name,
+        labels=frozenset({"tool_name"}),
+        stages=frozenset({"tool_call"}),
+        phase="detect",
+        fingerprint=_fingerprint("allowed_tools", name, *sorted(frozen)),
+        names=frozen,
+    )
+
+
+def _invalid_tool_name(name: object) -> bool:
+    return (
+        not isinstance(name, str)
+        or not name
+        or len(name) > 256
+        or name.strip() != name
+        or any(ord(char) < 32 for char in name)
+    )
+
+
 def canary(
     token: str,
     *,
@@ -540,6 +587,7 @@ def canary(
 
 __all__ = [
     "EXPLOIT_TERMS",
+    "allowed_tools",
     "canary",
     "invisible_text",
     "regex",

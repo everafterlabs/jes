@@ -176,7 +176,7 @@ def injection_candidate(*, threshold: float | None = None) -> _Candidate:
     return _policy(
         "injection",
         {"violation": question},
-        stages=("input", "untrusted"),
+        stages=("input", "untrusted", "tool_call"),
         context="none",
         version="injection.v1",
         threshold=threshold,
@@ -189,7 +189,7 @@ def indirect_injection_candidate(*, threshold: float | None = None) -> _Candidat
     return _policy(
         "indirect_injection",
         {"violation": question},
-        stages=("untrusted",),
+        stages=("untrusted", "tool_result"),
         context="optional",
         version="indirect_injection.v1",
         threshold=threshold,

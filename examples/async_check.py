@@ -14,7 +14,9 @@ async def check() -> InputResult:
         [injection(threshold=0.72)],
         backend=FakeBackend(answers={"violation": YesNoAnswer(0.1, "probability")}),
     )
-    return await guard.check_input("Please summarize the notes.")
+    result = await guard.check_input("Please summarize the notes.")
+    # Send result.onward to the model.
+    return result
 
 
 def main() -> InputResult:

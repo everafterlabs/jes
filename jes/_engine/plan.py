@@ -25,7 +25,7 @@ from jes.policies._protocols import (
 )
 from jes.questions import Choice, Question, Score, Threshold, validate_identifier
 from jes.redactions import RedactionTransaction, RedactionView
-from jes.types import Finding, FindingLocation, Message, Span, Stage, State, _TokenAuthority
+from jes.types import Finding, FindingLocation, Message, Role, Span, Stage, State, _TokenAuthority
 
 from .limits import GuardLimits, ResourceLimit, utf8_size
 from .sensitive import (
@@ -454,7 +454,7 @@ def _location(
     target: Literal["subject", "prompt", "question", "source", "history"],
     span: Span,
     index: int | None,
-    role: Literal["user", "assistant"] | None,
+    role: Role | None,
 ) -> FindingLocation:
     return FindingLocation(target=target, span=span, index=index, role=role)
 
@@ -487,9 +487,11 @@ def run_transforms(
     limits: GuardLimits,
     location_target: Literal["subject", "prompt", "question", "source", "history"],
     location_index: int | None = None,
-    location_role: Literal["user", "assistant"] | None = None,
+    location_role: Role | None = None,
     run_limit_phase: bool = True,
     neutralize: bool = True,
+    rewrite_placeholders: bool = True,
+    tool: str | None = None,
     session: TransformSession | None = None,
 ) -> TransformResult:
     """Run phase-ordered transforms and map local spans to original text."""
@@ -522,7 +524,7 @@ def run_transforms(
             )
         )
 
-    if neutralize:
+    if neutralize and rewrite_placeholders:
         text, mapping, neutralized, _preserved = neutralize_placeholders(
             text,
             mapping,
@@ -543,6 +545,8 @@ def run_transforms(
 
     def post_scan(*, label: str) -> None:
         nonlocal text, mapping
+        if not rewrite_placeholders:
+            return
         edits, _preserved = placeholder_edits(text, tracked=frozenset(tracked))
         if not edits:
             return
@@ -566,6 +570,7 @@ def run_transforms(
                 target=target,
                 redactions=redactions,
                 deadline=deadline,
+                tool=tool,
             )
             before_mapping = mapping
             before_text = text
@@ -673,7 +678,7 @@ def run_transforms(
             if deadline is not None and time.monotonic() >= deadline:
                 raise DeadlineExceeded("transform")
 
-    if not neutralize:
+    if rewrite_placeholders and not neutralize:
         post_scan(label="invalid_placeholder")
 
     collected: list[_TokenAuthority] = []

@@ -16,6 +16,7 @@ def main() -> tuple[InputResult, InputResult, InputResult, ScanResult]:
         [competitors(["Acme"])],
         backend=FakeBackend(),
     ).check_input("Call Acme today.")
+    # Keep redacted.onward. hostile.onward names the sentiment block.
     urls = Guard(
         [malicious_urls(threshold=0.80)],
         backend=FakeBackend(answers={"violation": YesNoAnswer(0.1, "probability")}),
@@ -30,4 +31,5 @@ def main() -> tuple[InputResult, InputResult, InputResult, ScanResult]:
         prompt=prompt,
         sources=["The total is four."],
     )
+    # inconsistent.onward names the factual-consistency block.
     return hostile, redacted, linked, inconsistent

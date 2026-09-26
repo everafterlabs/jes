@@ -15,8 +15,9 @@ def main() -> tuple[InputResult, ScanResult, InputResult, bytes]:
     store = Redactions(scope=b"conversation-1")
     guard = Guard([pii()], backend=backend)
     incoming = guard.check_input("email me at ada@example.com", redactions=store)
-    reply = f"I will write to { _token(incoming.sanitized) }."
+    reply = f"I will write to {_token(incoming.onward)}."
     outgoing = guard.check_output(reply, prompt=incoming, redactions=store)
+    # The user sees outgoing.onward, with the address restored.
     again = guard.check_input("ada@example.com again", redactions=store)
     blob = store.dumps(b"k" * 32, associated_data=b"cookbook")
     return incoming, outgoing, again, blob

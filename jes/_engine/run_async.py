@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from functools import partial
 
 from jes.backends import AsyncBackend, Backend, RequestBudget, RequestContext, SyncBackend
@@ -13,7 +13,15 @@ from jes.policies import Policy
 from jes.redactions import Redactions
 from jes.types import Finding, History, InputResult, ScanResult, Stage
 
-from .core import BaseGuard, CheckPlan, ContextValue, OnBackendError, RequestExecution
+from .core import (
+    BaseGuard,
+    CheckPlan,
+    ContextValue,
+    OnBackendError,
+    RequestExecution,
+    freeze_arguments,
+    require_tool_name,
+)
 from .limits import GuardLimits, ResourceLimit
 from .plan import PlannedRequest
 
@@ -144,6 +152,38 @@ class AsyncGuard(BaseGuard):
             history=history,
         )
 
+    async def check_tool_call(
+        self,
+        name: str,
+        arguments: str | Mapping[str, object],
+        *,
+        prompt: str | InputResult,
+        redactions: Redactions | None = None,
+    ) -> ScanResult:
+        return await self._check(
+            stage="tool_call",
+            text=freeze_arguments(arguments),
+            redactions=redactions,
+            prompt=prompt,
+            tool=require_tool_name(name),
+        )
+
+    async def check_tool_result(
+        self,
+        text: str,
+        *,
+        name: str,
+        prompt: str | InputResult | None = None,
+        redactions: Redactions | None = None,
+    ) -> ScanResult:
+        return await self._check(
+            stage="tool_result",
+            text=text,
+            redactions=redactions,
+            question=prompt,
+            tool=require_tool_name(name),
+        )
+
     async def _execute_one(
         self,
         request: PlannedRequest,
@@ -197,6 +237,7 @@ class AsyncGuard(BaseGuard):
         question: str | InputResult | None = None,
         sources: Sequence[str | ScanResult] = (),
         history: Sequence[History] = (),
+        tool: str | None = None,
     ) -> ScanResult:
         deadline = self._deadline()
         primary: ContextValue | None = prompt if prompt is not None else question
@@ -213,6 +254,7 @@ class AsyncGuard(BaseGuard):
                     question=question,
                     sources=sources,
                     history=history,
+                    tool=tool,
                     deadline=deadline,
                 )
                 prepared = await self.admission.run_sync(prepare_call)

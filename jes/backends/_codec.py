@@ -36,17 +36,20 @@ def render_state(state: State) -> str:
     if (
         state.prompt is None
         and state.question is None
+        and state.tool is None
         and not state.sources
         and not state.history
     ):
         return state.text
-    payload = {
+    payload: dict[str, object] = {
         "history": [{"role": message.role, "text": message.text} for message in state.history],
         "prompt": state.prompt,
         "question": state.question,
         "sources": list(state.sources),
         "text": state.text,
     }
+    if state.tool is not None:
+        payload["tool"] = state.tool
     return dumps(payload).decode("utf-8")
 
 

@@ -133,7 +133,9 @@ the rendered template, and an output reserve. Those totals are not text budgets.
 - `on_backend_error="allow"` does not add a block for that failure, and the
   result stays incomplete. `ok` is false.
 - Output judgments and restoration run on one complete reply. jes does not
-  check or restore a stream, and it does not restore tool-call arguments.
+  check or restore a stream. `check_tool_call` and `check_tool_result` scan
+  a tool call and a tool response as text. jes does not restore tool-call
+  arguments and does not authorize the tool.
 - Restoration is plain text. Escape values before Markdown, HTML, JSON, or a
   shell.
 - v1 does not moderate images or audio, does not detect an attack spread

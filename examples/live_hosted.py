@@ -22,7 +22,9 @@ def main() -> None:
     benign_score = benign.scores["injection.violation"].value
     attack_score = attack.scores["injection.violation"].value
     print(f"benign {benign.decision} complete={benign.complete} score={benign_score:.2f}")
+    print(f"benign onward: {benign.onward}")
     print(f"attack {attack.decision} complete={attack.complete} score={attack_score:.2f}")
+    print(f"attack onward: {attack.onward}")
 
 
 if __name__ == "__main__":

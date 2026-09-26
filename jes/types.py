@@ -13,10 +13,10 @@ from jes.questions import ScoreKind
 if TYPE_CHECKING:
     from jes.redactions import Redactions
 
-Stage: TypeAlias = Literal["input", "untrusted", "output"]
+Stage: TypeAlias = Literal["input", "untrusted", "output", "tool_call", "tool_result"]
 Action: TypeAlias = Literal["flag", "redact", "block"]
 Decision: TypeAlias = Literal["allow", "block"]
-Role: TypeAlias = Literal["user", "assistant"]
+Role: TypeAlias = Literal["user", "assistant", "tool"]
 LocationTarget: TypeAlias = Literal["subject", "prompt", "question", "source", "history"]
 
 _K = TypeVar("_K")
@@ -190,12 +190,14 @@ class State:
     question: str | None = None
     sources: tuple[str, ...] = ()
     history: tuple[Message, ...] = ()
+    tool: str | None = None
 
     def __repr__(self) -> str:
         return (
             f"State(stage={self.stage!r}, text_len={len(self.text)}, "
             f"prompt={self.prompt is not None}, question={self.question is not None}, "
-            f"sources={len(self.sources)}, history={len(self.history)})"
+            f"sources={len(self.sources)}, history={len(self.history)}, "
+            f"tool={self.tool is not None})"
         )
 
 
@@ -230,6 +232,26 @@ class ScanResult:
     @property
     def ok(self) -> bool:
         return self.allowed and self.complete
+
+    @property
+    def onward(self) -> str:
+        """Text safe to pass to the next hop. A refusal when the check is not ok."""
+
+        if self.ok:
+            return self.text if self.stage == "output" else self.sanitized
+        if self.stage == "tool_call":
+            return "Tool call blocked."
+        if self.stage == "tool_result":
+            return "Tool result blocked."
+        names = sorted(
+            {
+                finding.policy if finding.label == "violation" else finding.label
+                for finding in self.findings
+            }
+        )
+        if not names:
+            return "Blocked."
+        return f"Blocked: {', '.join(names)}."
 
     def __repr__(self) -> str:
         return (
