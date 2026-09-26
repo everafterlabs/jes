@@ -1276,7 +1276,7 @@ wheels = [
 
 [[package]]
 name = "jes"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
@@ -1363,9 +1363,9 @@ requires-dist = [
     { name = "tokenizers", marker = "extra == 'tokenizers'", specifier = ">=0.19,<1" },
     { name = "torch", marker = "extra == 'llama-guard'", specifier = ">=2.2" },
     { name = "torch", marker = "extra == 'prompt-guard'", specifier = ">=2.2" },
-    { name = "transformers", marker = "extra == 'llama-guard'", specifier = ">=4.40,<5" },
+    { name = "transformers", marker = "extra == 'llama-guard'", specifier = ">=4.40,<6" },
     { name = "transformers", marker = "extra == 'pii-ner'", specifier = ">=4.40" },
-    { name = "transformers", marker = "extra == 'prompt-guard'", specifier = ">=4.40,<5" },
+    { name = "transformers", marker = "extra == 'prompt-guard'", specifier = ">=4.40,<6" },
 ]
 provides-extras = ["crypto", "pii", "pii-ner", "json", "laya", "litellm", "llama-guard", "prompt-guard", "regex", "secrets", "tokenizers", "tokens"]
 

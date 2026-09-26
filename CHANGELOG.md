@@ -6,6 +6,14 @@ The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+## 0.3.0
+
+- Release the unevaluated recipe catalog: sentiment, emotions, gibberish, bias,
+  refusal, language, code, competitors, malicious URLs, relevance, factual
+  consistency, reading time, and JSON. Judgment recipes require `threshold=`.
+  URLReachability is not included.
+- Allow transformers 5.x for the Prompt Guard 2 and Llama Guard 4 extras.
+
 ## 0.2.0
 
 - Add Prompt Guard 2 and Llama Guard 4 adapters. Endpoints replay fixture-backed

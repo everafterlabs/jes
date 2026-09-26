@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "jes"
-version = "0.2.0"
+version = "0.3.0"
 description = "A policy engine for checking text around language models"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -34,8 +34,8 @@ pii-ner = [
 json = ["json-repair>=0.30"]
 laya = ["laya>=0.1"]
 litellm = ["litellm>=1.50,<2"]
-llama-guard = ["transformers>=4.40,<5", "torch>=2.2"]
-prompt-guard = ["transformers>=4.40,<5", "torch>=2.2"]
+llama-guard = ["transformers>=4.40,<6", "torch>=2.2"]
+prompt-guard = ["transformers>=4.40,<6", "torch>=2.2"]
 regex = ["regex>=2024.11.6"]
 secrets = ["detect-secrets>=1.5"]
 tokenizers = ["tokenizers>=0.19,<1"]

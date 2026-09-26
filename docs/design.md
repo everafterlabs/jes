@@ -2,7 +2,7 @@
 
 Package name: **jes** (import `jes`). This document specifies a new library. It is not a change to Protect AI’s LLM Guard, and it moves into the new repository in Milestone 0.
 
-Status: design, revised four times on 2026-09-25 after review. Milestone 0 can start now; Milestone 1 starts when this document is accepted. In this document, “v1” means the 1.x release line.
+Status: 0.2.0 and 0.3.0 are tagged. Published thresholds stay deferred. In this document, “v1” means the 1.x release line.
 
 ## 1. Purpose
 
@@ -1723,7 +1723,7 @@ Depends on: Milestone 7.
 Steps:
 
 1. Implement each recipe in section 10.4 from public APIs only, one pull request per recipe, each with its versioned question text, fake-backend tests, and a docs page.
-2. Tag 0.3.0.
+2. Tag 0.3.0. The recipe modules are the release. They stay unevaluated.
 
 Done when: every LLM Guard scanner maps to a core policy or a recipe (section 10.5), and URLReachability is documented as dropped. Every judgment recipe rejects a missing threshold; `malicious_urls` judges each URL as its own item, `relevance` runs on the whole text, and `factual_consistency` uses sources when passed.
 
