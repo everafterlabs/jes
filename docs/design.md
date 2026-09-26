@@ -1,6 +1,6 @@
 # jes — design
 
-Package name: **jes** (import `jes`). This document specifies a new library. It is not a change to Protect AI’s LLM Guard, and it moves into the new repository in Milestone 0.
+Package name: **jes** (import `jes`). This document is the design of that library. It is not a change to Protect AI’s LLM Guard.
 
 Status: 1.0.0 freezes the public factories and v1 question ids. Published thresholds stay deferred. In this document, “v1” means the 1.x release line.
 
@@ -14,7 +14,7 @@ jes is a Python library that checks text on the way into a model, text retrieved
 | Llama Prompt Guard 2 | Low-latency detection of explicit attempts to override an AI system’s instructions (injection and jailbreaks), in user text and in untrusted content |
 | Llama Guard 4 | Safe/unsafe classification against the hazard list S1–S14, for prompts and model replies |
 
-The abilities are **policies**. The models are **backends**. General backends (Laya, Jev, and capability-qualified models through LiteLLM) can answer arbitrary policy questions; Prompt Guard 2 and Llama Guard 4 run only the supported tasks they declare. The evaluation recommends backends and supplies thresholds for exact, measured configurations (section 11); the caller still chooses a backend.
+The abilities are **policies**. The models are **backends**. General backends (Laya, Jev, and capability-qualified models through LiteLLM) can answer arbitrary policy questions; Prompt Guard 2 and Llama Guard 4 run only the supported tasks they declare. The caller chooses the backend and passes `threshold=`. A later evaluation may recommend a backend and publish a threshold for one exact measured configuration (section 11). 1.0 does not.
 
 ## 2. Why jes
 
@@ -27,7 +27,7 @@ LLM Guard was archived in July 2026. The maintained alternatives solve adjacent 
 | LlamaFirewall | Meta’s scanners for agents: Prompt Guard 2, AlignmentCheck, CodeShield | Built around Meta’s models; no reversible PII placeholders; no general policy catalog |
 | OpenAI Guardrails | A drop-in wrapper for the OpenAI client with preflight, input, and output checks: Presidio PII, moderation, and LLM-based jailbreak and custom-prompt checks | Masks PII with generic tokens such as `<EMAIL_ADDRESS>`, so values cannot be restored in the reply; LLM checks use a confidence number the chat model writes |
 
-jes is one policy API over interchangeable judges, including cheap typed-decision models. Prompt Guard–style injection, Llama Guard’s hazard list, and reversible PII that works across turns and complete plain-text replies are first-class policies, and every decision profile with a default threshold has published evaluation numbers.
+jes is one policy API over interchangeable judges, including cheap typed-decision models. Prompt Guard–style injection, Llama Guard’s hazard list, and reversible PII that works across turns and complete plain-text replies are first-class policies. A default threshold, if a later release adds one, has published evaluation numbers for that exact profile. 1.0 has none.
 
 ## 3. Decisions
 
@@ -101,7 +101,7 @@ The acceptance-test mapping is explicit:
 - resource bounds → exact-boundary and atomic-failure tests for every cap;
 - log/exception secrecy → DEBUG-log, safe-`repr`, built-in failure, and custom failure canary tests.
 
-jes does not guarantee that any judgment is correct. Detection quality is measured and published per backend (section 11).
+jes does not guarantee that any judgment is correct. 1.0 does not publish detection quality. A later measured default follows section 11.
 
 ## 6. Architecture
 
@@ -197,7 +197,7 @@ reply = call_model(incoming.sanitized, context)
 outgoing = guard.check_output(reply, prompt=incoming, sources=safe_documents)
 ```
 
-The backend and thresholds in this example are illustrative application choices, not recommendations. 0.2.0 publishes no default thresholds, so every judgment passes `threshold=`. Omitting it succeeds only for a later audited decision-profile fingerprint. The checkpoint revision identifies weights, independently of the installed Laya package version. Otherwise construction fails (section 7.4).
+The backend and thresholds in this example are illustrative application choices, not recommendations. 1.0 publishes no default thresholds, so every judgment passes `threshold=`. Omitting it succeeds only for a later audited decision-profile fingerprint. The checkpoint revision identifies weights, independently of the installed Laya package version. Otherwise construction fails (section 7.4).
 
 A multi-turn chat keeps one `Redactions` store per conversation, passes earlier results as history, and restores placeholders after checking the complete reply:
 
@@ -710,7 +710,7 @@ class Threshold:
 
 **Request and decision profiles.** Construction first computes a `RequestProfile` for every state-independent question partition. It fingerprints ordered subject/context transforms; engine and HTTP-serialization versions; exact behavior-affecting dependency/model/data assets; renderer/planner versions; backend capabilities/profile/attestation; stage/context/source/subject modes; exact partition; chunk rules; total-window budget; template/tokenizer; and generation settings. It describes what is sent, not a policy threshold.
 
-For each policy in that request, construction computes a `DecisionProfile`. It adds policy kind/version/subset, stage, question and answer-kind schema, interpretation version, and merge version to the request-profile hash. `jes/policies/defaults.py`, generated from evaluation calibration data, maps each decision-profile fingerprint—not a shared request fingerprint—to one threshold and evaluation run id. A bundled request therefore resolves a threshold vector keyed by policy name.
+For each policy in that request, construction computes a `DecisionProfile`. It adds policy kind/version/subset, stage, question and answer-kind schema, interpretation version, and merge version to the request-profile hash. `jes/policies/defaults.py` maps each decision-profile fingerprint—not a shared request fingerprint—to one threshold and evaluation run id. The table is empty in 1.0. A bundled request therefore resolves a threshold vector keyed by policy name.
 
 Any decision-profile mismatch requires an explicit threshold. That includes a floating model, different policy subset, changed transforms/question partition/chunk rules, provider/template/scorer, or interpretation/merge version. Recipes and `judge()` always require explicit thresholds. Examples pin immutable weight revisions or digests (`laya:english@hf:<commit>#sha256:<digest>`, `jev-1.13.0`, or an Ollama digest); aliases such as `jev-latest` never match.
 
@@ -1252,7 +1252,7 @@ Natural-language PII recognition uses an NFKC copy because named-entity recognit
 - `topics` asks one yes/no question per topic, not one choice, because text can touch several topics. It always requires a threshold, since caller-defined topics cannot have a measured default.
 - `hazards` scores the text by its “any hazard” score: the backend’s `hazard.any` answer when its `tasks` list that task (Llama Guard 4), otherwise the highest category score. The threshold applies to that score. Findings name the categories whose own scores cross the threshold, or the codes Llama Guard lists (`unattributed` when it lists none).
 - Hazard instructions restate the public category definitions in jes’s own words.
-- Final wording is tuned on development data, assigned exact `v1` ids before calibration in Milestone 6, then verified and published unchanged in Milestone 7.
+- The v1 wording was frozen for 0.2.0 without a development wording study. A later change is a new version id. v1 is not edited in place.
 
 | Code | Hazard |
 | --- | --- |
@@ -1326,20 +1326,22 @@ Recipes cover the rest of LLM Guard’s catalog. They are built only from public
 
 ## 11. Evaluation
 
-The evaluation recommends request profiles and supplies default thresholds for exact per-policy decision profiles. It never silently selects a backend at runtime, and its numbers are published.
+This section is the rule for a later release that publishes a default. 1.0 does not publish one, and it does not recommend a backend. The harness and `evals/protocol.md` are in the tree. One Jev development run was recorded. Selection, calibration, and the sealed audit were not opened.
+
+When a release does publish a default, that evaluation recommends request profiles and supplies thresholds for exact per-policy decision profiles. It never silently selects a backend at runtime.
 
 - **Location:** `evals/` in the repository, not in the package.
 - **Data:** datasets are downloaded at run time from pinned revisions. Licenses, provider terms, allowed hosted processing, and retention constraints are recorded in `evals/datasets.toml` and reviewed before use, since several popular safety sets are non-commercial. Raw texts are never committed; published results are aggregate numbers only.
 - **Categories:**
-    - direct injection and jailbreaks;
-    - indirect injection in documents and tool output (candidate: BIPIA);
-    - hazards labeled with S1–S14;
-    - toxicity;
-    - benign text, including long documents and prompts that look unsafe but are not (candidate: XSTest), to measure false positives;
+    - direct injection and jailbreaks; no positive set is accepted yet;
+    - indirect injection in documents and tool output; the Jev development run used BIPIA table and code train only;
+    - hazards labeled with S1–S14; that run used XSTest safe and unsafe prompts and stayed below the support minimum;
+    - toxicity; no dataset is accepted yet;
+    - benign text, including long documents and prompts that look unsafe but are not; that run used XSTest prompts, not the model completions;
     - judge-directed attacks, where the text addresses the classifier, generated from templates;
     - padding attacks, where an attack follows benign padding at several offsets, generated from templates, with prose padding and with control-character padding;
     - PII detection: recall and precision per entity type for `pii`, with `ner="spacy"` and with a transformer model, including joiner and variation-selector evasions.
-- **Discipline:** development tunes wording and explores models; a selection split ranks request/decision-profile candidates; calibration fits thresholds for the selected candidates; and a sealed audit split is opened once for final acceptance/reporting. If a candidate fails audit, it gets no default/recommendation; trying another requires fresh holdout data. Every split is grouped by source document or dataset-defined group, never row. Near-duplicates, padded variants, and one template family stay together. Known training contamination is reported separately.
+- **Discipline:** development explores models. v1 question bytes are frozen, so later development data does not retune them; a wording change is a new version id. A selection split ranks request/decision-profile candidates; calibration fits thresholds for the selected candidates; and a sealed audit split is opened once for final acceptance. If a candidate fails audit, it gets no default; trying another requires fresh holdout data. Every split is grouped by source document or dataset-defined group, never row. Near-duplicates, padded variants, and one template family stay together. Known training contamination is reported separately.
 - **Repeated releases:** sealed audit data is never used to pick wording, models, ranking, or thresholds and is not repeatedly reused for changed profiles. Any changed prompt, transform, planner/interpreter/merge version, adapter/provider/model/dependency, tokenizer/template, generation setting, question partition, budget, or threshold uses a fresh rolling holdout for acceptance; historical data is comparability-only.
 - **Backends:**
     - immutable Laya `english` and `multilingual` artifacts in process or through a controlled manifest-attested `laya-serve` deployment, and a pinned Jev provider profile;
@@ -1350,21 +1352,22 @@ The evaluation recommends request profiles and supplies default thresholds for e
 - **Operational completeness:** every attempted check contributes to denominators. Reports include completion rate and counts/rates for transport errors, timeouts, malformed answers, missing logprob candidates, retries, and resource blocks. The evaluation runner uses `on_backend_error="block"` for operational safety metrics, so an incomplete check counts as a block; a parallel raise-mode diagnostic classifies the underlying error. Model-only conditional metrics may be secondary but never replace operational metrics. A logprob profile whose valid response omits a required candidate is unsupported rather than filtered.
 - **Metrics per (policy, decision profile):** independent-group and row counts; ROC AUC and PR AUC for non-label scores; catch rate at 1% and 5% false-positive rate; false-positive rate at 95% catch rate; false-positive rate by text length; expected calibration error by score kind; uncached latency p50/p95; physical requests/retries per check; completion/error rates; and public cost. Label-only profiles report their operating point rather than meaningless curves.
 - **Uncertainty:** rates and AUCs use cluster-aware intervals over the independent split group, never row bootstrap. `evals/protocol.md` pre-registers power-derived minimum row and independent-cluster counts for benign, positive, and category subgroups; meeting 10,000 rows alone is never sufficient. Recommendation comparisons use a pre-registered simultaneous-confidence procedure such as Holm correction, with every support count and interval published.
-- **Pre-registration:** before Milestone 6, maintainers accept the target false-positive rate, operational failure treatment, profile ranking, minimum independent-group support, simultaneous audit procedure, and tie-breakers. The proposed target is 1%. Selection data ranks candidates and freezes a finalist set before audit. The sealed audit accepts/rejects that set with simultaneous one-sided bounds and never reranks or substitutes a failed finalist; a new candidate needs fresh holdout data. If none qualifies, recommend none.
+- **Pre-registration:** `evals/protocol.md` accepts the target false-positive rate of 1%, the operational failure treatment, profile ranking, minimum independent-group support, simultaneous audit procedure, and tie-breakers. The development cohort has been inspected, so those rules stay fixed for that split. Selection data ranks candidates and freezes a finalist set before audit. The sealed audit accepts or rejects that set with simultaneous one-sided bounds and never reranks or substitutes a failed finalist; a new candidate needs fresh holdout data. If none qualifies, recommend none.
 - **Default thresholds:** on calibration, enumerate observed score cutoffs and choose the lowest threshold whose cluster-aware one-sided 95% upper false-positive bound meets the target. The exact decision profile spans its evaluated policy, stage, question set, interpretation, and merge behavior. Sealed audit/fresh rolling holdout must independently pass. Defaults are block-only (`flag_at=None`); a flag band needs its own protocol. Any decision-profile mismatch requires another evaluation or explicit threshold.
 - **Bundles:** a bundle has one request profile and a vector of decision profiles/thresholds. `evals/protocol.md` pre-registers its guard-level false-positive/catch targets and completion requirement; individually calibrated policies cannot substitute for that gate. A bundle is recommended only when its exact threshold-vector fingerprint passes sealed audit/fresh holdout. Bundle results and every component profile are published.
-- **Topics:** caller-defined topics never receive a default. A fixed representative topic suite evaluates prompt wording and robustness before `topics.v1` is frozen, without claiming its threshold transfers to arbitrary topics.
+- **Topics:** caller-defined topics never receive a default. `topics.v1` is already frozen. A later topic suite can score wording and robustness. It does not change that id and does not produce a default.
 - **PII metrics:** PII is not forced into backend/profile ROC metrics. Each recognizer configuration records exact model/config revisions, supported entities and language, exact-span and overlap-span micro/macro precision/recall/F1, per-entity support, evasion recall, and latency p50/p95. It produces no judgment threshold entry.
-- **Report:** JSON under `evals/results/<run-id>/` and a generated markdown table copied into the README.
+- **Report:** JSON under `evals/results/<run-id>/` and a generated markdown table. A release that publishes a default copies that table into the README. 1.0 does not.
 - **Cache:** development caching keys the canonical rendered state, full question schema, request/decision profiles, and generation settings. It stores validated answers only—not inputs, raw provider bodies, latency, retries, failures, or `Usage.request`. Replays are marked cached, receive run-local canonical usage metadata, and are excluded from latency/completion/cost acceptance metrics. Release acceptance metrics run uncached.
 - **CI:** a smoke run against the fake backend tests the plumbing. Real runs are manual.
-- **When to rerun:** before a minor release that publishes or changes a measured default, and whenever that request profile, decision profile, threshold vector, or recommended bundle changes. 0.1.0 and 0.2.0 publish none. Their quickstart uses an explicit threshold.
+- **When to rerun:** before a minor release that publishes or changes a measured default, and whenever that request profile, decision profile, threshold vector, or recommended bundle changes. 0.1.0 through 1.0.0 publish none. The quickstart uses an explicit threshold.
 
 ## 12. Package layout and dependencies
 
 ```text
 jes/
   __init__.py            # Guard, AsyncGuard, Redactions, results, Threshold, errors
+  _env.py                # optional project .env for unset API keys
   errors.py
   types.py               # results, scores, provenance, items, messages, state
   questions.py           # YesNo, Choice, Score, answers, validation
@@ -1384,7 +1387,7 @@ jes/
     _protocols.py        # TransformPolicy, JudgmentPolicy
     _fold.py             # folding and NFKC copies with offset maps; vendored confusables and Unicode property data
     prompts.py           # versioned instruction text
-    defaults.py          # evaluated decision-profile thresholds (generated)
+    defaults.py          # decision-profile thresholds; empty until a later audit
     transforms.py        # invisible_text, regex, substrings, token_limit, canary
     secrets.py
     pii.py
@@ -1419,7 +1422,7 @@ The core depends only on `httpx`. Everything else is an extra, imported inside t
 | `llama-guard` | transformers, torch | `LlamaGuard4.local` |
 | `json` | json-repair | `recipes.json_check(repair=True)` |
 
-Tooling: uv for environments and the lockfile, hatchling, ruff, pyright in strict mode on `jes/`, pytest with hypothesis.
+Tooling: uv for environments and the lockfile, hatchling, ruff, pyright in strict mode on `jes/` and `evals/`, pytest with hypothesis.
 
 API-sensitive extras have tested compatibility bounds in `pyproject.toml`, established from fixtures before their milestone. The uv lock records exact CI versions, but defaults do not rely on the lock alone: each request profile records exact installed versions and asset hashes for jes planner/renderer, httpx serialization, regex, detect-secrets/plugins, tiktoken, Presidio, spaCy model, idna data, LiteLLM, Laya, transformers, torch, tokenizers, and model packages as applicable. A different behavior-affecting version cannot reuse a default until that exact profile is evaluated.
 
@@ -1445,7 +1448,7 @@ API-sensitive extras have tested compatibility bounds in `pyproject.toml`, estab
 - Deadlines: transport, retry, permit, cooperative CPU, and async wait expiry all exercise identical `DeadlineExceeded` behavior in raise/block/allow modes; resource-cap failures remain strict blocks.
 - No fixture contains hazardous content. Hazard and toxicity findings are exercised by returning high violation scores from the fake backend.
 - Coverage gate: 90% line and branch coverage on `jes/`.
-- CI runs lint, type checks, and tests on Python 3.11–3.14. Extras run on the Python versions their dependencies support. A manual job runs live backend tests when secrets are configured.
+- CI runs lint, type checks, and tests on Python 3.11–3.14. Extras run on the Python versions their dependencies support. There is no workflow for live backend tests. Those runs are manual.
 
 ## 14. Observability
 
@@ -1468,15 +1471,15 @@ API-sensitive extras have tested compatibility bounds in `pyproject.toml`, estab
 
 | Release | After | Contents |
 | --- | --- | --- |
-| TestPyPI 0.0.1 | Milestone 0 | Disposable pipeline proof; never uploaded to public PyPI |
-| 0.1.0 | Milestones 0–4 | First public release: engine, `Guard` and `AsyncGuard`, core transforms, secrets and PII with authenticated complete-reply restoration, System One and LiteLLM backends, `judge()` |
+| TestPyPI 0.0.1 | Milestone 0 | Disposable pipeline proof. Not uploaded. |
+| 0.1.0 | Milestones 0–4 | Changelog only. Not tagged. Engine, `Guard` and `AsyncGuard`, core transforms, secrets and PII, System One and LiteLLM, `judge()`. The first git tag is 0.2.0. |
 | 0.2.0 | Milestones 5–7 | Meta adapters, evaluation harness, and core judgment policies. Every call passes an explicit threshold. No published defaults and no recommended backend. |
 | 0.3.0 | Milestone 8 | Recipes for the rest of LLM Guard’s catalog |
 | 1.0.0 | Milestone 9 | Frozen public factories and v1 question ids, migration guide, README limitations. No published defaults. |
 
 ## 16. Milestones
 
-Each milestone ends with its tests passing offline, `ruff` clean, and `pyright` clean on the code it added.
+Milestones 0–9 are in the tagged tree. The status notes below record where a release differed from the original step. Each milestone still ends with its tests passing offline, `ruff` clean, and `pyright` clean on the code it added.
 
 ### Milestone 0 — Repository baseline
 
@@ -1485,15 +1488,15 @@ Depends on: nothing.
 Steps:
 
 1. Establish and commit the existing repository baseline with this file at `docs/design.md`.
-2. Add `LICENSE` (Apache-2.0), `CHANGELOG.md`, and a `README.md` with the purpose, a “design in progress, no release” line, and a plain statement of jes’s relationship to TypeSafe and Meta: independent if it is, the relationship if not. The evaluation publishes numbers comparing Jev with its competitors, so this line must be literally true.
+2. Add `LICENSE` (Apache-2.0), `CHANGELOG.md`, and a `README.md` with the purpose and a plain statement of jes’s relationship to TypeSafe and Meta. The README states that relationship, including if a later evaluation compares Jev with other backends.
 3. Add `SECURITY.md`: private reporting through GitHub security advisories, supported versions, and what counts as a vulnerability (for example, a bypass of a guarantee in section 5).
 4. Add `CONTRIBUTING.md` (how to run tests, no model downloads in CI, no hazardous fixtures, and the prompt-version rule) and `CODE_OF_CONDUCT.md`.
 5. Add `pyproject.toml` (hatchling; name `jes`; `requires-python = ">=3.11"`; dependency `httpx`), a uv lockfile, and configuration for ruff, pyright (strict on `jes/`), pytest, and coverage.
-6. Add CI for lint, type checks, and tests on Python 3.11–3.14, with every GitHub Action pinned by commit SHA and Dependabot keeping the pins current. Add a TestPyPI workflow for Milestone 0 and a separate manual public release workflow using PyPI trusted publishing, disabled until a functional release.
+6. Add CI for lint, type checks, and tests on Python 3.11–3.14, with every GitHub Action pinned by commit SHA and Dependabot keeping the pins current. Add a manual TestPyPI workflow and a manual public-release workflow. Neither has been run.
 7. Add `jes/__init__.py` exposing `__version__`.
-8. Build, upload, install, and import version 0.0.1 on TestPyPI to prove packaging and trusted publishing. Do not upload it to public PyPI.
+8. Build, upload, install, and import version 0.0.1 on TestPyPI. Not done. Do not upload a disposable proof to public PyPI.
 
-Done when: a clean clone passes CI, `import jes` works with only `httpx` installed, and the TestPyPI artifact can be installed in a clean environment. The first public upload waits for functional 0.1.0.
+Done when: a clean clone passes CI and `import jes` works with only `httpx` installed. The TestPyPI 0.0.1 upload was not performed. Nothing has been published to public PyPI. The GitHub repository is private.
 
 Out of scope: engine, policy, and backend code.
 
@@ -1554,7 +1557,7 @@ Depends on: nothing in the package. Runs in parallel with Milestone 1.
 
 A throwaway script, not committed: score a few hundred examples from one public injection set and one benign set with Laya `english` through `laya-serve`, Jev, and Prompt Guard 2 86M, and report ROC AUC and catch rate at 5% false-positive rate. `docs/spike.md` records the datasets, immutable revisions, and numbers.
 
-Done when `docs/spike.md` exists. Among backends implemented by Milestone 4, its numbers choose the illustrative 0.1.0 quickstart and whether the README leads with cheap decision models; Prompt Guard results inform Milestones 5–7 only. The quickstart uses an explicitly application-chosen threshold and labels it non-default. Spike numbers are not published as evaluation results; Milestone 6 produces those.
+Status: that script was not run. `docs/spike.md` says so. The quickstart uses local Laya with an application-chosen threshold. Those figures are not evaluation results.
 
 ### Milestone 2 — Text transforms
 
@@ -1637,6 +1640,8 @@ Done when:
 - LiteLLM performs no hidden retry/fallback/cache/hedge; every physical call acquires a jes permit, and its injected transport enforces success/error response caps.
 - A `BackendError` raised for a 422 whose body echoes the input contains none of that input.
 
+Status: 0.1.0 was not tagged. Jev fixtures were captured from the hosted API. Laya fixtures were not captured from a live `laya-serve`.
+
 Out of scope: starting servers in CI, and live calls.
 
 ### Milestone 5 — Prompt Guard 2 and Llama Guard 4 adapters
@@ -1691,11 +1696,13 @@ The same run reports the separate PII metric contract from section 11 for `ner="
 
 The run must contain enough grouped support for its confidence-bound rules. Profiles below support remain exploratory and cannot generate defaults.
 
+Status: the harness, the protocol, the fake-backend smoke path, and one Jev development run exist. Ranking, calibration, and the sealed audit are deferred. 1.0 does not wait on them. Laya fixtures were not captured from a live `laya-serve`. The Jev fixtures were captured from the hosted API.
+
 Out of scope: fine-tuning, and committing raw data.
 
 ### Milestone 7 — Core judgment policies (0.2.0)
 
-Depends on: Milestones 3 and 6.
+Depends on: Milestones 3 and 6. Tagged as 0.2.0 with the public factories and an empty `defaults.py`. The Milestone 6 audit was not a gate for that tag.
 
 Steps:
 
@@ -1726,6 +1733,8 @@ Steps:
 2. Tag 0.3.0. The recipe modules are the release. They stay unevaluated.
 
 Done when: every LLM Guard scanner maps to a core policy or a recipe (section 10.5), and URLReachability is documented as dropped. Every judgment recipe rejects a missing threshold; `malicious_urls` judges each URL as its own item, `relevance` runs on the whole text, and `factual_consistency` uses sources when passed.
+
+Status: tagged as 0.3.0. The recipes landed in one commit, not one pull request each. They are unevaluated.
 
 Out of scope: evaluating recipes. Promotion to core requires evaluation data.
 
@@ -1775,11 +1784,11 @@ Done when every configured stream-compatible transform/finalizer passes split-eq
 
 ## 17. First implementation session
 
-Historical. Milestones 0–9 are implemented. 0.2.0, 0.3.0, and 1.0.0 are tagged. Published thresholds remain deferred. Milestone 1’s tests stay the contract every backend and policy must satisfy.
+Historical. The tagged releases are 0.2.0, 0.3.0, and 1.0.0. Published thresholds remain deferred. Section 16's status notes list the original steps that were not completed. Milestone 1’s tests stay the contract every backend and policy must satisfy.
 
 ## 18. Acceptance
 
-Accepted: package name `jes`, Apache-2.0, evaluated decision-profile thresholds over pinned request profiles, caller-selected recommended backends, scoped authenticated redaction stores, strict completion semantics, complete plain-text restoration in v1, no streamed or generic tool restoration, and the milestone order above. The name appeared available on PyPI when checked on 2026-09-25, but Milestone 0 uses TestPyPI only and the first public release is functional 0.1.0. jes is one letter from Jev, so the README states its relationship to TypeSafe plainly.
+Accepted: package name `jes`, Apache-2.0, explicit thresholds until an audit qualifies a fingerprint, no recommended backend in 1.0, scoped authenticated redaction stores, strict completion semantics, complete plain-text restoration in v1, no streamed or generic tool restoration, and the milestone order above. The first git tag is 0.2.0. 0.1.0 is changelog history and was not tagged. TestPyPI 0.0.1 was not uploaded, and 1.0.0 is not on public PyPI. jes is one letter from Jev, so the README states its relationship to TypeSafe plainly.
 
 Deferred, not blocking 1.0:
 

@@ -6,6 +6,9 @@ The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+- Align `docs/design.md` with the tagged releases: no published defaults,
+  no recommended backend, and the audit left unopened.
+
 ## 1.0.0
 
 - Freeze the public factory signatures and the v1 question ids.
