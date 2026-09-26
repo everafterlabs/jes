@@ -50,13 +50,16 @@ class _SensitiveOutcome:
         return f"_SensitiveOutcome(edits={len(self.edits)}, findings={len(self.findings)})"
 
 
-class _SensitiveTransform(Protocol):  # pyright: ignore[reportUnusedClass]
+class _SensitiveTransform(Protocol):
     def _apply_sensitive(
         self,
         text: str,
         call: CallContext,
         transaction: RedactionTransaction,
     ) -> _SensitiveOutcome: ...
+
+
+_ = _SensitiveTransform
 
 
 @dataclass(frozen=True, slots=True)

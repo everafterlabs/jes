@@ -179,10 +179,13 @@ def secrets(
     return policy
 
 
-def _reset_secrets_config() -> None:  # pyright: ignore[reportUnusedFunction]
+def _reset_secrets_config() -> None:
     global _configured
     with _LOCK:
         _configured = None
+
+
+_ = _reset_secrets_config
 
 
 __all__ = ["secrets"]

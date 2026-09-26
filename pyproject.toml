@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "jes"
-version = "0.3.0"
+version = "1.0.0"
 description = "A policy engine for checking text around language models"
 readme = "README.md"
 requires-python = ">=3.11"

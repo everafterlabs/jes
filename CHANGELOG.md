@@ -6,6 +6,12 @@ The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+## 1.0.0
+
+- Freeze the public factory signatures and the v1 question ids.
+- Add `docs/migration.md` and the README limitations. Every judgment still
+  passes `threshold=`. No default or recommended backend is published.
+
 ## 0.3.0
 
 - Release the unevaluated recipe catalog: sentiment, emotions, gibberish, bias,

@@ -19,12 +19,15 @@ def lookup(fingerprint: str) -> tuple[Threshold, str] | None:
     return THRESHOLDS.get(fingerprint)
 
 
-def _register(fingerprint: str, threshold: Threshold, evaluation_run: str) -> None:  # pyright: ignore[reportUnusedFunction]
+def _register(fingerprint: str, threshold: Threshold, evaluation_run: str) -> None:
     THRESHOLDS[fingerprint] = (threshold, evaluation_run)
 
 
-def _clear() -> None:  # pyright: ignore[reportUnusedFunction]
+def _clear() -> None:
     THRESHOLDS.clear()
+
+
+_ = (_register, _clear)
 
 
 __all__ = ["THRESHOLDS", "_clear", "_register", "lookup"]

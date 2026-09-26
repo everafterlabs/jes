@@ -2,7 +2,7 @@
 
 Package name: **jes** (import `jes`). This document specifies a new library. It is not a change to Protect AI’s LLM Guard, and it moves into the new repository in Milestone 0.
 
-Status: 0.2.0 and 0.3.0 are tagged. Published thresholds stay deferred. In this document, “v1” means the 1.x release line.
+Status: 1.0.0 freezes the public factories and v1 question ids. Published thresholds stay deferred. In this document, “v1” means the 1.x release line.
 
 ## 1. Purpose
 
@@ -1472,7 +1472,7 @@ API-sensitive extras have tested compatibility bounds in `pyproject.toml`, estab
 | 0.1.0 | Milestones 0–4 | First public release: engine, `Guard` and `AsyncGuard`, core transforms, secrets and PII with authenticated complete-reply restoration, System One and LiteLLM backends, `judge()` |
 | 0.2.0 | Milestones 5–7 | Meta adapters, evaluation harness, and core judgment policies. Every call passes an explicit threshold. No published defaults and no recommended backend. |
 | 0.3.0 | Milestone 8 | Recipes for the rest of LLM Guard’s catalog |
-| 1.0.0 | Milestone 9 | Frozen API and question ids, migration guide |
+| 1.0.0 | Milestone 9 | Frozen public factories and v1 question ids, migration guide, README limitations. No published defaults. |
 
 ## 16. Milestones
 
@@ -1738,10 +1738,10 @@ Steps:
 1. `docs/migration.md`: each LLM Guard class and its jes equivalent, with notes that thresholds do not carry over and that PII recall differs unless `ner=` names a transformer model like LLM Guard’s default.
 2. `__all__` on public modules; pyright strict with no ignores outside the optional-import shims.
 3. README limitations: short context on local Laya, label-only scores without log-probabilities, explicit incomplete fail-open results, output judgments/restoration only on complete replies, plain-text-only restoration, no streamed/tool-argument restoration, no images, no multi-turn detection, no decoding of obfuscated payloads, and no safety guarantee.
-4. Freeze core and recipe question ids and every public factory signature. Rerun the evaluation on the release candidate and publish it.
+4. Freeze core and recipe question ids and every public factory signature. 1.0 does not rerun the evaluation and does not publish thresholds.
 5. Tag 1.0.0.
 
-Done when: a new user can follow the README and see a blocked injection plus an email redacted/restored using documented imports. The example uses a recommended default when one qualified; if evaluation recommends none, it uses an audit-evaluated profile with a clearly labeled application-chosen explicit threshold and makes no recommendation/default claim.
+Done when: a new user can follow the README and see an injection check plus an email redacted and restored, using documented imports. The example uses a clearly labeled application-chosen explicit threshold and makes no recommendation or default claim.
 
 ### Milestone 10 — HTTP service (after 1.0.0)
 
@@ -1775,15 +1775,14 @@ Done when every configured stream-compatible transform/finalizer passes split-eq
 
 ## 17. First implementation session
 
-Do Milestones 0 and 1 only, then stop. Milestone 1’s tests are the contract every backend and policy must satisfy. The zero-shot spike can run alongside; it needs a `laya-serve` instance, a Jev key, and Prompt Guard 2 access, not package code.
+Historical. Milestones 0–9 are implemented. 0.2.0, 0.3.0, and 1.0.0 are tagged. Published thresholds remain deferred. Milestone 1’s tests stay the contract every backend and policy must satisfy.
 
 ## 18. Acceptance
 
 Accepted: package name `jes`, Apache-2.0, evaluated decision-profile thresholds over pinned request profiles, caller-selected recommended backends, scoped authenticated redaction stores, strict completion semantics, complete plain-text restoration in v1, no streamed or generic tool restoration, and the milestone order above. The name appeared available on PyPI when checked on 2026-09-25, but Milestone 0 uses TestPyPI only and the first public release is functional 0.1.0. jes is one letter from Jev, so the README states its relationship to TypeSafe plainly.
 
-Open points that do not block Milestones 0–5:
+Deferred, not blocking 1.0:
 
-- The target false-positive rate and backend-recommendation protocol (proposed: 1% on the benign set with the section 11 rule). They must be accepted in `evals/protocol.md` before Milestone 6, but do not block Milestones 0–5.
-- The benign and hazard datasets, chosen after license review in Milestone 6.
-- The two LiteLLM models besides gpt-oss-safeguard (proposed: one cheap hosted non-reasoning model that returns log-probabilities, and one local model through Ollama).
-- The 0.1.0 quickstart backend, decided by the zero-shot spike before Milestone 4’s README step.
+- `evals/protocol.md` accepts the 1% false-positive rule. No sealed audit has been opened, and 1.0 publishes no default or recommended backend.
+- Dataset review for a future audit is recorded in `evals/datasets.toml`. The zero-shot spike produced no numbers. The quickstart uses local Laya with an explicit threshold.
+- The two LiteLLM profiles besides gpt-oss-safeguard stay unchosen until a release wants a measured threshold.
