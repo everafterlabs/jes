@@ -14,7 +14,8 @@ frozen v1 question text. Every call passes `threshold=`. A category or label
 subset is a different decision profile and does not inherit another profile's
 threshold. Topics never receive a default. The unevaluated catalog is in
 [`docs/recipes.md`](docs/recipes.md). Moving from LLM Guard is described in
-[`docs/migration.md`](docs/migration.md). URLReachability is not included.
+[`docs/migration.md`](docs/migration.md). Longer patterns are in
+[`docs/cookbook.md`](docs/cookbook.md). URLReachability is not included.
 
 ## Install
 
