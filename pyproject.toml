@@ -42,7 +42,7 @@ tokenizers = ["tokenizers>=0.19,<1"]
 tokens = ["tiktoken>=0.8,<1"]
 
 [project.urls]
-Documentation = "https://github.com/henbenmoshe/jes"
+Documentation = "https://docs.getjes.dev"
 Repository = "https://github.com/henbenmoshe/jes"
 Issues = "https://github.com/henbenmoshe/jes/issues"
 

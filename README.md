@@ -1,5 +1,7 @@
 # jes
 
+**Documentation: [docs.getjes.dev](https://docs.getjes.dev)**
+
 jes is a Python policy engine that checks text around a language model.
 
 The project is independent and is not affiliated with or endorsed by TypeSafe,
@@ -9,9 +11,9 @@ ships no third-party weights.
 
 **There are no measured judgment defaults and no recommended backend.**
 Every `threshold=` is an application choice. Topics never receive a default.
-Recipes are listed in [`docs/recipes.md`](docs/recipes.md). Moving from LLM Guard
-is described in [`docs/migration.md`](docs/migration.md). Longer patterns are in
-[`docs/cookbook.md`](docs/cookbook.md).
+Recipes are listed in [Recipes](https://docs.getjes.dev/recipes). Moving from
+LLM Guard is described in the [migration guide](https://docs.getjes.dev/migration).
+Longer patterns are in the [cookbook](https://docs.getjes.dev/cookbook).
 
 ## Install
 

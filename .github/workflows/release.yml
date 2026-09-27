@@ -20,3 +20,18 @@ jobs:
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
       - run: uv build
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
+
+  docs:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Rebuild docs.getjes.dev
+        env:
+          DOCS_DEPLOY_HOOK: ${{ secrets.DOCS_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$DOCS_DEPLOY_HOOK" ]; then
+            echo "DOCS_DEPLOY_HOOK is not set; skipping the docs rebuild."
+            exit 0
+          fi
+          curl -fsS -X POST "$DOCS_DEPLOY_HOOK" > /dev/null
