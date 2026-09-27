@@ -10,9 +10,8 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Literal, cast
 
-from jes.backends import Backend, DecisionProfile, RequestProfile
-from jes.backends._profiles import attestation_digest_for
 from jes.errors import DeadlineExceeded, PolicyError, PolicyExecutionError
+from jes.judge import Backend, DecisionProfile, RequestProfile, attestation_digest_for
 from jes.policies import defaults
 from jes.policies._protocols import (
     CallContext,
@@ -267,7 +266,7 @@ def compile_guard(
         policy = cast(JudgmentPolicy, candidate)
         backend = policy.backend or default_backend
         if backend is None:
-            raise PolicyError(f"judgment {policy.name} has no backend")
+            raise PolicyError(f"judgment {policy.name} has no model")
         if backend.capabilities.max_attempts < 1:
             raise PolicyError("max_attempts must be at least one")
         if policy.context == "required" and policy.stages != frozenset({"output"}):

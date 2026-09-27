@@ -6,8 +6,8 @@ import pickle
 import pytest
 
 from jes import AsyncGuard, Guard
-from jes.backends import BackendCapabilities, BackendProfile, BackendResult, BackendUsage
 from jes.errors import DeadlineExceeded, PolicyError, PolicyExecutionError, RedactionError
+from jes.judge import BackendCapabilities, BackendProfile, BackendResult, BackendUsage
 from jes.policies import judge
 from jes.questions import Choice, ChoiceAnswer, Score, ScoreAnswer, YesNo, YesNoAnswer
 from jes.redactions import Redactions
@@ -105,7 +105,7 @@ def test_mask_partial_and_finalizer_copy() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
     result = Guard(
         [fake_sensitive("p", "ABCDEF", mode="mask_partial"), yesno_policy()],
-        backend=backend,
+        model=backend,
     ).check_input("ABCDEF")
     assert "ABCDEF" not in result.sanitized
     from jes._engine.sensitive import FinalizerMap
@@ -147,12 +147,12 @@ def test_redaction_scope_and_closed_transaction() -> None:
 def test_sync_guard_rejects_async_only(monkeypatch) -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
     # FakeBackend is both; construction should succeed.
-    Guard([yesno_policy()], backend=backend)
+    Guard([yesno_policy()], model=backend)
 
 
 @pytest.mark.asyncio
 async def test_async_uses_sync_only_backend() -> None:
-    result = await AsyncGuard([yesno_policy()], backend=SyncOnly()).check_input("ok")
+    result = await AsyncGuard([yesno_policy()], model=SyncOnly()).check_input("ok")
     assert result.ok
     assert result.usage[0].backend == "sync-only"
 
@@ -161,12 +161,12 @@ async def test_async_uses_sync_only_backend() -> None:
 async def test_async_deadline_raise() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")}, delay_s=0.05)
     with pytest.raises(DeadlineExceeded):
-        await AsyncGuard([yesno_policy()], backend=backend, deadline_s=0.001).check_input("x")
+        await AsyncGuard([yesno_policy()], model=backend, deadline_s=0.001).check_input("x")
 
 
 def test_sources_and_item_overflow_allow() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
-    incoming = Guard([yesno_policy()], backend=backend).check_input("q")
+    incoming = Guard([yesno_policy()], model=backend).check_input("q")
     policy = judge(
         "src",
         YesNo("bad?"),
@@ -175,7 +175,7 @@ def test_sources_and_item_overflow_allow() -> None:
         context="optional",
         sources=True,
     )
-    result = Guard([policy], backend=backend).check_output(
+    result = Guard([policy], model=backend).check_output(
         "a",
         prompt=incoming,
         sources=["one", "two"],
@@ -197,7 +197,7 @@ def test_sources_and_item_overflow_allow() -> None:
         max_policy_items=1,
         on_items_overflow="allow",
     )
-    overflowed = Guard([overflow], backend=backend).check_input("abcd")
+    overflowed = Guard([overflow], model=backend).check_input("abcd")
     assert overflowed.complete is False
     assert overflowed.decision == "allow"
 
@@ -206,14 +206,14 @@ def test_authority_verify_rejects_forged() -> None:
     from jes._engine.authority import verify_stamp
 
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
-    guard = Guard([yesno_policy()], backend=backend)
+    guard = Guard([yesno_policy()], model=backend)
     result = guard.check_input("ok")
     assert not verify_stamp(b"0" * 32, result, config_digest="nope", redactions=result.redactions)
 
 
 def test_check_untrusted_raw_question() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
-    result = Guard([yesno_policy()], backend=backend).check_untrusted("doc", question="what?")
+    result = Guard([yesno_policy()], model=backend).check_untrusted("doc", question="what?")
     assert result.ok
 
 
@@ -227,7 +227,7 @@ def test_run_sync_deadline_block() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")}, delay_s=0.05)
     result = Guard(
         [yesno_policy()],
-        backend=backend,
+        model=backend,
         deadline_s=0.001,
         on_backend_error="block",
     ).check_input("x")
@@ -335,10 +335,10 @@ def test_judge_mapping_forms_and_items_none() -> None:
             "b": ChoiceAnswer({"s": 1.0, "t": 0.0}, "probability"),
         }
     )
-    assert Guard([policy], backend=backend).check_input("x").ok
+    assert Guard([policy], model=backend).check_input("x").ok
     backend.register_answer("a", ScoreAnswer((1.0, 0.0), "probability"))
     backend.register_answer("b", ScoreAnswer((1.0, 0.0), "probability"))
-    scored_result = Guard([scored], backend=backend).check_input("x")
+    scored_result = Guard([scored], model=backend).check_input("x")
     assert scored_result.complete
     assert "levels.a" in scored_result.scores
     text_policy = judge("plain", YesNo("q"), threshold=0.8)
@@ -347,7 +347,7 @@ def test_judge_mapping_forms_and_items_none() -> None:
 
 def test_input_result_deepcopy_and_ok() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
-    result = Guard([yesno_policy()], backend=backend).check_input("ok")
+    result = Guard([yesno_policy()], model=backend).check_input("ok")
     assert result.allowed and result.ok
     with pytest.raises(TypeError):
         copy.deepcopy(result)
@@ -373,6 +373,6 @@ def test_short_mask_partial() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
     result = Guard(
         [fake_sensitive("p", "AB", mode="mask_partial"), yesno_policy()],
-        backend=backend,
+        model=backend,
     ).check_input("AB")
     assert "AB" not in result.sanitized

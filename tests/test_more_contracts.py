@@ -7,7 +7,6 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 from jes import AsyncGuard, Guard
-from jes.backends import BackendProfile
 from jes.errors import (
     BackendError,
     DeadlineExceeded,
@@ -15,6 +14,7 @@ from jes.errors import (
     PolicyExecutionError,
     RedactionError,
 )
+from jes.judge import BackendProfile
 from jes.policies import Item, TransformEdit, judge
 from jes.policies._protocols import apply_transform_edits
 from jes.policies.defaults import lookup
@@ -50,7 +50,7 @@ def test_judge_yesno_choice_score_and_flag() -> None:
             violation_level=2,
         ),
     ]
-    result = Guard(policies, backend=backend).check_input("text")
+    result = Guard(policies, model=backend).check_input("text")
     assert "yn.violation" in result.scores
     assert result.scores["ch.pick"].value == pytest.approx(0.3)
     assert result.scores["sc.rate"].value == pytest.approx(0.7)
@@ -62,14 +62,14 @@ def test_flag_at_does_not_block() -> None:
 
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.5, "probability")})
     policy = judge("flaggy", YesNo("bad?"), threshold=Threshold(block_at=0.9, flag_at=0.4))
-    result = Guard([policy], backend=backend).check_input("x")
+    result = Guard([policy], model=backend).check_input("x")
     assert result.decision == "allow"
     assert any(finding.action == "flag" for finding in result.findings)
 
 
 def test_check_untrusted_and_history_messages() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
-    guard = Guard([yesno_policy()], backend=backend)
+    guard = Guard([yesno_policy()], model=backend)
     incoming = guard.check_input("ask", history=[Message(role="user", text="earlier")])
     untrusted = guard.check_untrusted("doc", question=incoming)
     assert untrusted.ok
@@ -85,9 +85,9 @@ def test_optional_history_drops_oldest() -> None:
     backend = FakeBackend(max_units=400, answers={"violation": YesNoAnswer(0.0, "probability")})
     policy = judge("ctx", YesNo("bad?"), threshold=0.8, stages=("output",), context="optional")
     prompt_backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
-    incoming = Guard([yesno_policy()], backend=prompt_backend).check_input("q")
+    incoming = Guard([yesno_policy()], model=prompt_backend).check_input("q")
     history = [Message(role="user", text="h" * 80) for _ in range(6)]
-    result = Guard([policy], backend=backend).check_output("ans", prompt=incoming, history=history)
+    result = Guard([policy], model=backend).check_output("ans", prompt=incoming, history=history)
     assert result.ok
     used = backend.calls[-1][0].history
     assert len(used) < 6
@@ -95,7 +95,7 @@ def test_optional_history_drops_oldest() -> None:
 
 def test_store_mismatch_raises_redaction_error() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
-    guard = Guard([yesno_policy()], backend=backend)
+    guard = Guard([yesno_policy()], model=backend)
     incoming = guard.check_input("x")
     with pytest.raises(RedactionError):
         guard.check_output("y", prompt=incoming, redactions=Redactions())
@@ -103,7 +103,7 @@ def test_store_mismatch_raises_redaction_error() -> None:
 
 def test_isolation_across_stores() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
-    guard = Guard([yesno_policy()], backend=backend)
+    guard = Guard([yesno_policy()], model=backend)
     left = Redactions()
     right = Redactions()
 
@@ -117,7 +117,7 @@ def test_isolation_across_stores() -> None:
 
 def test_forged_stamp_is_resanitized() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
-    guard = Guard([yesno_policy()], backend=backend)
+    guard = Guard([yesno_policy()], model=backend)
     incoming = guard.check_input("hello")
     forged = ScanResult(
         stage="input",
@@ -203,7 +203,7 @@ def test_defaults_lookup_empty() -> None:
 
 def test_guard_context_managers() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
-    with Guard([yesno_policy()], backend=backend) as guard:
+    with Guard([yesno_policy()], model=backend) as guard:
         assert guard.check_input("ok").ok
 
 
@@ -211,11 +211,11 @@ def test_guard_context_managers() -> None:
 async def test_async_untrusted_output_and_parity() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.1, "probability")})
     policies = [yesno_policy()]
-    async with AsyncGuard(policies, backend=backend) as guard:
+    async with AsyncGuard(policies, model=backend) as guard:
         incoming = await guard.check_input("ask")
         untrusted = await guard.check_untrusted("doc", question=incoming)
         outgoing = await guard.check_output("reply", prompt=incoming)
-    sync = Guard(policies, backend=backend)
+    sync = Guard(policies, model=backend)
     assert_semantic_parity(incoming, sync.check_input("ask"))
     assert untrusted.ok and outgoing.ok
 
@@ -228,7 +228,7 @@ def test_custom_backend_exception_wrapped() -> None:
             raise RuntimeError(canary)
 
     with pytest.raises(PolicyExecutionError) as caught:
-        Guard([yesno_policy()], backend=Boom()).check_input("x")
+        Guard([yesno_policy()], model=Boom()).check_input("x")
     assert canary not in str(caught.value)
     assert caught.value.__cause__ is None
     assert caught.value.__context__ is None
@@ -253,7 +253,7 @@ def test_location_after_prior_transform() -> None:
             FakeTransform("det", frozenset({"hit"}), handler=detect),
             yesno_policy(),
         ],
-        backend=backend,
+        model=backend,
     )
     result = guard.check_input("xxBAD")
     finding = next(item for item in result.findings if item.label == "hit")
@@ -269,7 +269,7 @@ def test_whole_text_overflow_allow() -> None:
         whole_text=True,
         on_text_overflow="allow",
     )
-    result = Guard([policy], backend=backend).check_input("word " * 200)
+    result = Guard([policy], model=backend).check_input("word " * 200)
     assert result.complete is False
     assert result.decision == "allow"
 
@@ -281,7 +281,7 @@ def test_item_mode_happy_path() -> None:
         return [Item(text=text[0:2], span=Span(0, 2))]
 
     policy = judge("it", YesNo("item?"), threshold=0.8, items=items)
-    result = Guard([policy], backend=backend).check_input("abcdef")
+    result = Guard([policy], model=backend).check_input("abcdef")
     assert result.ok
     assert backend.calls[0][0].text == "ab"
 
@@ -299,7 +299,7 @@ async def test_async_deadline_allow() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")}, delay_s=0.05)
     result = await AsyncGuard(
         [yesno_policy()],
-        backend=backend,
+        model=backend,
         deadline_s=0.001,
         on_backend_error="allow",
     ).check_input("x")

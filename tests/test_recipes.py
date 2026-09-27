@@ -55,20 +55,20 @@ def test_snapshot_and_required_threshold() -> None:
 
 def test_yesno_recipes_block_on_a_high_score() -> None:
     backend = _yes()
-    assert Guard([sentiment(threshold=0.5)], backend=backend).check_input("x").decision == "block"
-    assert Guard([gibberish(threshold=0.5)], backend=backend).check_input("x").decision == "block"
-    biased = Guard([bias(threshold=0.5)], backend=backend).check_output("x", prompt="p")
+    assert Guard([sentiment(threshold=0.5)], model=backend).check_input("x").decision == "block"
+    assert Guard([gibberish(threshold=0.5)], model=backend).check_input("x").decision == "block"
+    biased = Guard([bias(threshold=0.5)], model=backend).check_output("x", prompt="p")
     assert biased.decision == "block"
-    refused = Guard([refusal(threshold=0.5)], backend=backend).check_output("x", prompt="p")
+    refused = Guard([refusal(threshold=0.5)], model=backend).check_output("x", prompt="p")
     assert refused.decision == "block"
     relevant = relevance(threshold=0.5)
     assert relevant.whole_text is True
     assert relevant.context == "required"
-    assert Guard([relevant], backend=backend).check_output("x", prompt="p").decision == "block"
+    assert Guard([relevant], model=backend).check_output("x", prompt="p").decision == "block"
     consistent = factual_consistency(threshold=0.5)
     assert consistent.sources is True
     assert consistent.whole_text is True
-    checked = Guard([consistent], backend=backend).check_output(
+    checked = Guard([consistent], model=backend).check_output(
         "x",
         prompt="p",
         sources=("a source",),
@@ -76,7 +76,7 @@ def test_yesno_recipes_block_on_a_high_score() -> None:
     assert checked.decision == "block"
     same = language_same(threshold=0.5)
     assert same.context == "required"
-    assert Guard([same], backend=backend).check_output("x", prompt="p").decision == "block"
+    assert Guard([same], model=backend).check_output("x", prompt="p").decision == "block"
 
 
 def test_emotions_language_and_code() -> None:
@@ -84,14 +84,14 @@ def test_emotions_language_and_code() -> None:
         max_units=100_000,
         answers={"anger": YesNoAnswer(0.8, "probability")},
     )
-    result = Guard([emotions(("anger",), threshold=0.5)], backend=emotions_backend).check_input("x")
+    result = Guard([emotions(("anger",), threshold=0.5)], model=emotions_backend).check_input("x")
     assert result.decision == "block"
 
     language_backend = FakeBackend(
         max_units=100_000,
         answers={"violation": ChoiceAnswer({"en": 0.2, "other": 0.8}, "probability")},
     )
-    detected = Guard([language(("en",), threshold=0.5)], backend=language_backend).check_input("x")
+    detected = Guard([language(("en",), threshold=0.5)], model=language_backend).check_input("x")
     assert detected.decision == "block"
 
     code_backend = FakeBackend(
@@ -112,20 +112,20 @@ def test_emotions_language_and_code() -> None:
         },
     )
     banned = code("ban", ("sql",), threshold=0.5)
-    assert Guard([banned], backend=code_backend).check_input("x").decision == "block"
+    assert Guard([banned], model=code_backend).check_input("x").decision == "block"
 
 
 def test_malicious_urls_are_separate_items() -> None:
     backend = _yes()
     text = "see https://example.com/a and https://example.com/a"
-    result = Guard([malicious_urls(threshold=0.5)], backend=backend).check_input(text)
+    result = Guard([malicious_urls(threshold=0.5)], model=backend).check_input(text)
     assert result.decision == "block"
     assert len(backend.calls) == 2
     assert all(call[0].text == "https://example.com/a" for call in backend.calls)
 
     crowded = " ".join(f"https://example.com/{index}" for index in range(21))
     quiet = FakeBackend(max_units=100_000, answers={"violation": YesNoAnswer(0.1, "probability")})
-    overflow = Guard([malicious_urls(threshold=0.5)], backend=quiet).check_input(crowded)
+    overflow = Guard([malicious_urls(threshold=0.5)], model=quiet).check_input(crowded)
     assert overflow.decision == "block"
     assert any(item.label == "too_many_urls" for item in overflow.findings)
     assert quiet.calls == []

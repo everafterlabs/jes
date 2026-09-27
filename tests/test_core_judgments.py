@@ -66,26 +66,26 @@ def test_frozen_question_bytes() -> None:
 
 def test_threshold_boundaries() -> None:
     backend = _backend()
-    blocked = Guard([injection(threshold=0.5)], backend=backend).check_input("boundary")
+    blocked = Guard([injection(threshold=0.5)], model=backend).check_input("boundary")
     assert blocked.decision == "block"
-    allowed = Guard([injection(threshold=0.51)], backend=backend).check_input("boundary")
+    allowed = Guard([injection(threshold=0.51)], model=backend).check_input("boundary")
     assert allowed.decision == "allow"
     flagged = Guard(
         [injection(threshold=Threshold(block_at=0.8, flag_at=0.5))],
-        backend=backend,
+        model=backend,
     ).check_input("boundary")
     assert flagged.decision == "allow"
     assert flagged.findings[0].action == "flag"
     indirect = Guard(
         [indirect_injection(threshold=0.5)],
-        backend=backend,
+        model=backend,
     ).check_untrusted("boundary")
     assert indirect.decision == "block"
     backend.register_answer("topic_0", YesNoAnswer(0.5, "probability"))
-    topic = Guard([topics(("weather",), threshold=0.5)], backend=backend).check_input("boundary")
+    topic = Guard([topics(("weather",), threshold=0.5)], model=backend).check_input("boundary")
     assert topic.decision == "block"
     backend.register_answer("toxicity", YesNoAnswer(0.5, "probability"))
-    toxic = Guard([toxicity(("toxicity",), threshold=0.5)], backend=backend).check_input(
+    toxic = Guard([toxicity(("toxicity",), threshold=0.5)], model=backend).check_input(
         "boundary"
     )
     assert toxic.decision == "block"
@@ -99,7 +99,7 @@ def test_hazard_names_and_unattributed() -> None:
     named.register_answer("S2", YesNoAnswer(0.1, "probability"))
     result = Guard(
         [hazards(("S1", "S2", "S9"), threshold=0.5)],
-        backend=named,
+        model=named,
     ).check_input("marker")
     assert result.decision == "block"
     assert {item.label for item in result.findings} == {"S1", "S9"}
@@ -107,7 +107,7 @@ def test_hazard_names_and_unattributed() -> None:
     plain = _backend()
     plain.register_answer("any", YesNoAnswer(0.9, "probability"))
     plain.register_answer("S1", YesNoAnswer(0.1, "probability"))
-    unnamed = Guard([hazards(("S1",), threshold=0.5)], backend=plain).check_input("marker")
+    unnamed = Guard([hazards(("S1",), threshold=0.5)], model=plain).check_input("marker")
     assert {item.label for item in unnamed.findings} == {"unattributed"}
 
 
@@ -115,17 +115,17 @@ def test_missing_default_and_complete_vector() -> None:
     _clear()
     backend = _backend()
     with pytest.raises(PolicyError):
-        Guard([injection()], backend=backend)
+        Guard([injection()], model=backend)
     explicit = Guard(
         [injection(threshold=0.4), toxicity(("toxicity",), threshold=0.4)],
-        backend=backend,
+        model=backend,
     )
     fingerprints = _fingerprints(explicit, backend)
     for fingerprint in fingerprints:
         _register(fingerprint, Threshold(block_at=0.4), "test-run")
-    Guard([injection(), toxicity(("toxicity",), threshold=0.4)], backend=backend)
+    Guard([injection(), toxicity(("toxicity",), threshold=0.4)], model=backend)
     with pytest.raises(PolicyError):
-        Guard([injection(), toxicity(("insult",))], backend=backend)
+        Guard([injection(), toxicity(("insult",))], model=backend)
     with pytest.raises(PolicyError):
-        Guard([injection()], backend=_backend("other@2"))
+        Guard([injection()], model=_backend("other@2"))
     _clear()

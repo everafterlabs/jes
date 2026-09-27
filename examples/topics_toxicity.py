@@ -12,11 +12,11 @@ _ZERO = YesNoAnswer(0.0, "probability")
 def main() -> tuple[InputResult, InputResult]:
     topic_result = Guard(
         [topics(["medical advice"], threshold=0.70)],
-        backend=FakeBackend(answers={"topic_0": YesNoAnswer(0.8, "probability")}),
+        model=FakeBackend(answers={"topic_0": YesNoAnswer(0.8, "probability")}),
     ).check_input("What dose should I take?")
     toxic = Guard(
         [toxicity(threshold=0.70)],
-        backend=FakeBackend(
+        model=FakeBackend(
             default_answer=_ZERO,
             answers={"insult": YesNoAnswer(0.9, "probability")},
         ),

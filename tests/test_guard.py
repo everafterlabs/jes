@@ -19,7 +19,7 @@ from tests.helpers import FakeTransform, rewrite, yesno_policy
 
 def test_transform_then_judgment_sees_transformed_text() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
-    guard = Guard([rewrite("raw", "clean"), yesno_policy()], backend=backend)
+    guard = Guard([rewrite("raw", "clean"), yesno_policy()], model=backend)
     result = guard.check_input("raw text")
     assert result.ok
     assert backend.calls[0][0].text == "clean text"
@@ -45,7 +45,7 @@ def test_normalize_runs_before_detect_regardless_of_list_order() -> None:
             FakeTransform("norm", frozenset({"x"}), phase="normalize", handler=normalize),
             yesno_policy(),
         ],
-        backend=backend,
+        model=backend,
     )
     guard.check_input("hello")
     assert order == ["normalize", "detect"]
@@ -55,7 +55,7 @@ def test_raw_context_is_transformed_and_block_propagates() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
     blocker = rewrite("attack", "xx", label="bad", action="block")
     blocker.stages = frozenset({"input"})
-    guard = Guard([blocker, yesno_policy()], backend=backend)
+    guard = Guard([blocker, yesno_policy()], model=backend)
     incoming = guard.check_input("safe")
     outgoing = guard.check_output("reply", prompt="attack prompt")
     assert outgoing.decision == "block"
@@ -66,7 +66,7 @@ def test_raw_context_is_transformed_and_block_propagates() -> None:
 
 def test_forged_and_blocked_results_cannot_carry_authority() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.99, "probability")})
-    guard = Guard([yesno_policy()], backend=backend)
+    guard = Guard([yesno_policy()], model=backend)
     blocked = guard.check_input("bad")
     assert not blocked.ok
     backend.register_answer("violation", YesNoAnswer(0.0, "probability"))
@@ -74,15 +74,15 @@ def test_forged_and_blocked_results_cannot_carry_authority() -> None:
     assert outgoing.decision == "block"
     assert any(finding.label == "context_not_ok" for finding in outgoing.findings)
 
-    other = Guard([yesno_policy("other")], backend=backend)
+    other = Guard([yesno_policy("other")], model=backend)
     allowed = other.check_input("fine")
-    reused = Guard([yesno_policy()], backend=backend).check_output("ok", prompt=allowed)
+    reused = Guard([yesno_policy()], model=backend).check_output("ok", prompt=allowed)
     assert reused.ok is False or reused.complete is True
 
 
 def test_placeholder_in_raw_input_is_neutralized() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
-    guard = Guard([yesno_policy()], backend=backend)
+    guard = Guard([yesno_policy()], model=backend)
     result = guard.check_input("see [JES_v1_PII_abc_def] here")
     assert "JES_LITERAL" in result.sanitized
     assert any(finding.label == "placeholder_in_input" for finding in result.findings)
@@ -101,7 +101,7 @@ def test_choice_split_across_options_blocks() -> None:
         threshold=0.8,
         violating=("a", "b"),
     )
-    result = Guard([policy], backend=backend).check_input("text")
+    result = Guard([policy], model=backend).check_input("text")
     assert result.decision == "block"
     assert result.scores["topics.topic"].value == pytest.approx(0.9)
 
@@ -118,7 +118,7 @@ def test_two_chunk_second_chunk_blocks() -> None:
 
     recording = Recording(max_units=400)
     payload = "aaa " * 120 + "ZZZ"
-    result = Guard([yesno_policy()], backend=recording, max_chunks=8).check_input(payload)
+    result = Guard([yesno_policy()], model=recording, max_chunks=8).check_input(payload)
     assert len(texts) >= 2
     assert result.decision == "block"
 
@@ -126,7 +126,7 @@ def test_two_chunk_second_chunk_blocks() -> None:
 def test_fail_fast_skips_judgments() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
     blocker = rewrite("bad", "xx", label="blocked", action="block")
-    guard = Guard([blocker, yesno_policy()], backend=backend, fail_fast=True)
+    guard = Guard([blocker, yesno_policy()], model=backend, fail_fast=True)
     result = guard.check_input("bad input")
     assert result.decision == "block"
     assert result.complete is False
@@ -141,10 +141,10 @@ def test_on_backend_error_modes() -> None:
     boom = Boom()
     policy = yesno_policy()
     with pytest.raises(BackendError):
-        Guard([policy], backend=boom, on_backend_error="raise").check_input("x")
-    blocked = Guard([policy], backend=boom, on_backend_error="block").check_input("x")
+        Guard([policy], model=boom, on_backend_error="raise").check_input("x")
+    blocked = Guard([policy], model=boom, on_backend_error="block").check_input("x")
     assert blocked.decision == "block" and blocked.complete is False
-    allowed = Guard([policy], backend=boom, on_backend_error="allow").check_input("x")
+    allowed = Guard([policy], model=boom, on_backend_error="allow").check_input("x")
     assert allowed.decision == "allow" and allowed.complete is False and allowed.ok is False
     assert any(
         finding.label == "backend_error" and finding.action == "flag"
@@ -155,10 +155,10 @@ def test_on_backend_error_modes() -> None:
 def test_deadline_modes() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")}, delay_s=0.05)
     with pytest.raises(DeadlineExceeded):
-        Guard([yesno_policy()], backend=backend, deadline_s=0.001).check_input("x")
+        Guard([yesno_policy()], model=backend, deadline_s=0.001).check_input("x")
     blocked = Guard(
         [yesno_policy()],
-        backend=FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")}, delay_s=0.05),
+        model=FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")}, delay_s=0.05),
         deadline_s=0.001,
         on_backend_error="block",
     ).check_input("x")
@@ -168,8 +168,8 @@ def test_deadline_modes() -> None:
 
 def test_scores_include_passing_questions_and_threshold_changes_provenance() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.1, "probability")})
-    low = Guard([yesno_policy("p", threshold=0.8)], backend=backend).check_input("ok")
-    high = Guard([yesno_policy("p", threshold=0.05)], backend=backend).check_input("ok")
+    low = Guard([yesno_policy("p", threshold=0.8)], model=backend).check_input("ok")
+    high = Guard([yesno_policy("p", threshold=0.05)], model=backend).check_input("ok")
     score = low.scores["p.violation"]
     assert score.kind == "probability"
     assert score.provenance.threshold.source == "explicit"
@@ -197,7 +197,7 @@ def test_redactions_repr_and_serialization_fail() -> None:
 
 def test_input_result_cannot_be_copied() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
-    result = Guard([yesno_policy()], backend=backend).check_input("ok")
+    result = Guard([yesno_policy()], model=backend).check_input("ok")
     with pytest.raises(TypeError):
         copy.copy(result)
     with pytest.raises(TypeError):
@@ -214,7 +214,7 @@ def test_custom_transform_exception_is_wrapped() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
     transform = FakeTransform("boom", frozenset({"x"}), handler=boom)
     with pytest.raises(PolicyExecutionError) as caught:
-        Guard([transform, yesno_policy()], backend=backend).check_input("hello")
+        Guard([transform, yesno_policy()], model=backend).check_input("hello")
     error = caught.value
     assert canary not in str(error)
     assert error.__cause__ is None
@@ -224,7 +224,7 @@ def test_custom_transform_exception_is_wrapped() -> None:
 
 def test_trace_and_usage_are_canonical() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
-    result = Guard([yesno_policy()], backend=backend, trace=True).check_input("ok")
+    result = Guard([yesno_policy()], model=backend, trace=True).check_input("ok")
     assert result.timings is not None
     assert result.usage[0].request == 0
 
@@ -235,7 +235,7 @@ def test_check_backend_contract() -> None:
 
 def test_headroom_includes_controls_emoji_and_quotes() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
-    Guard([yesno_policy()], backend=backend).check_input('control:\x00 emoji:😀 quote:"')
+    Guard([yesno_policy()], model=backend).check_input('control:\x00 emoji:😀 quote:"')
     rendered = backend.render(*backend.calls[0])
     assert backend.count_units(rendered) <= 1_024
 
@@ -251,8 +251,8 @@ def test_required_context_overflow() -> None:
         whole_text=True,
     )
     prompt_backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
-    incoming = Guard([yesno_policy()], backend=prompt_backend).check_input("p" * 200)
-    result = Guard([policy], backend=backend).check_output("answer", prompt=incoming)
+    incoming = Guard([yesno_policy()], model=prompt_backend).check_input("p" * 200)
+    result = Guard([policy], model=backend).check_output("answer", prompt=incoming)
     assert result.complete is False
     assert any(finding.label == "context_too_long" for finding in result.findings)
 
@@ -267,13 +267,13 @@ def test_item_span_validation() -> None:
 
     policy = judge("items", YesNo("bad item"), threshold=0.8, items=bad_items)
     with pytest.raises(PolicyExecutionError):
-        Guard([policy], backend=backend).check_input("abcdef")
+        Guard([policy], model=backend).check_input("abcdef")
 
 
 @pytest.mark.asyncio
 async def test_sync_async_parity() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.1, "probability")})
     policies = [rewrite("raw", "clean"), yesno_policy()]
-    sync = Guard(policies, backend=backend).check_input("raw")
-    async_result = await AsyncGuard(policies, backend=backend).check_input("raw")
+    sync = Guard(policies, model=backend).check_input("raw")
+    async_result = await AsyncGuard(policies, model=backend).check_input("raw")
     assert_semantic_parity(sync, async_result)

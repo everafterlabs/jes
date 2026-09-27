@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 
-from jes.backends import Backend
+from jes.judge import Backend
 from jes.policies import (
     CallContext,
     ContextMode,

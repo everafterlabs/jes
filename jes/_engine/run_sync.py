@@ -5,8 +5,8 @@ from __future__ import annotations
 import time
 from collections.abc import Mapping, Sequence
 
-from jes.backends import RequestContext, SyncBackend
 from jes.errors import BackendError, DeadlineExceeded, PolicyError, PolicyExecutionError
+from jes.judge import ModelSpec, RequestContext, SyncBackend, resolve_judge
 from jes.policies import Policy
 from jes.redactions import Redactions
 from jes.types import Finding, History, InputResult, ScanResult, Stage
@@ -30,7 +30,7 @@ class Guard(BaseGuard):
         self,
         policies: Sequence[Policy],
         *,
-        backend: SyncBackend | None = None,
+        model: ModelSpec | None = None,
         fail_fast: bool = False,
         on_backend_error: OnBackendError = "raise",
         max_input_bytes: int = 1_048_576,
@@ -82,7 +82,7 @@ class Guard(BaseGuard):
         )
         super().__init__(
             policies,
-            backend=backend,
+            backend=resolve_judge(model),
             fail_fast=fail_fast,
             on_backend_error=on_backend_error,
             limits=limits,

@@ -18,7 +18,7 @@ def main() -> tuple[InputResult, ScanResult, ScanResult]:
             indirect_injection(threshold=THRESHOLD),
             hazards(threshold=THRESHOLD),
         ],
-        backend=FakeBackend(
+        model=FakeBackend(
             max_units=100_000,
             default_answer=_ZERO,
             answers={

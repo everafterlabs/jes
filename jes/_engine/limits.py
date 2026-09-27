@@ -13,8 +13,8 @@ from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass, fields
 from typing import TypeVar
 
-from jes.backends import RequestBudget, RequestPermit
 from jes.errors import DeadlineExceeded, PolicyError
+from jes.judge import RequestBudget, RequestPermit
 
 _T = TypeVar("_T")
 

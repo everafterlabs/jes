@@ -5,8 +5,8 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
-from jes.backends import Backend
 from jes.errors import BackendError, PolicyError
+from jes.judge import Backend
 from jes.policies._protocols import (
     ContextMode,
     InterpretationContext,

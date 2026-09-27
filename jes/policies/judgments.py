@@ -8,8 +8,8 @@ from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import cast
 
-from jes.backends import Backend
 from jes.errors import BackendError, PolicyError
+from jes.judge import Backend, ModelSpec, resolve_judge
 from jes.policies._candidates import (
     _Candidate,
     hazards_candidate,
@@ -213,7 +213,7 @@ def judge(
     max_policy_items: int | None = None,
     item_overflow_label: str = "too_many_items",
     on_items_overflow: OverflowMode = "block",
-    backend: Backend | None = None,
+    model: ModelSpec | None = None,
     version: str = "v1",
     interpretation_version: str = "v1",
 ) -> _JudgePolicy:
@@ -268,7 +268,7 @@ def judge(
         sources=sources,
         whole_text=whole_text,
         on_text_overflow=on_text_overflow,
-        backend=backend,
+        backend=resolve_judge(model),
         threshold=threshold_value,
         version=version,
         interpretation_version=interpretation_version,
@@ -295,33 +295,33 @@ def _publish(
     policy: _Candidate,
     *,
     threshold: float | Threshold | None,
-    backend: Backend | None,
+    model: ModelSpec | None,
 ) -> _Candidate:
-    return replace(policy, threshold=_applied_threshold(threshold), backend=backend)
+    return replace(policy, threshold=_applied_threshold(threshold), backend=resolve_judge(model))
 
 
 def injection(
     *,
     threshold: float | Threshold | None = None,
     version: str = "v1",
-    backend: Backend | None = None,
+    model: ModelSpec | None = None,
 ) -> _Candidate:
     """Frozen injection.v1 question. Omit threshold only for an audited profile."""
 
     _checked_version(version, "injection.v1")
-    return _publish(injection_candidate(), threshold=threshold, backend=backend)
+    return _publish(injection_candidate(), threshold=threshold, model=model)
 
 
 def indirect_injection(
     *,
     threshold: float | Threshold | None = None,
     version: str = "v1",
-    backend: Backend | None = None,
+    model: ModelSpec | None = None,
 ) -> _Candidate:
     """Frozen indirect_injection.v1 question. Omit threshold only for an audited profile."""
 
     _checked_version(version, "indirect_injection.v1")
-    return _publish(indirect_injection_candidate(), threshold=threshold, backend=backend)
+    return _publish(indirect_injection_candidate(), threshold=threshold, model=model)
 
 
 def hazards(
@@ -329,12 +329,12 @@ def hazards(
     *,
     threshold: float | Threshold | None = None,
     version: str = "v1",
-    backend: Backend | None = None,
+    model: ModelSpec | None = None,
 ) -> _Candidate:
     """Frozen hazards.v1 questions. A category subset is a different decision profile."""
 
     _checked_version(version, "hazards.v1")
-    return _publish(hazards_candidate(categories), threshold=threshold, backend=backend)
+    return _publish(hazards_candidate(categories), threshold=threshold, model=model)
 
 
 def topics(
@@ -342,12 +342,12 @@ def topics(
     *,
     threshold: float | Threshold,
     version: str = "v1",
-    backend: Backend | None = None,
+    model: ModelSpec | None = None,
 ) -> _Candidate:
     """Frozen topics.v1 template. Caller-defined topics always require a threshold."""
 
     _checked_version(version, "topics.v1")
-    return _publish(topics_candidate(deny, threshold=1.0), threshold=threshold, backend=backend)
+    return _publish(topics_candidate(deny, threshold=1.0), threshold=threshold, model=model)
 
 
 def toxicity(
@@ -355,12 +355,12 @@ def toxicity(
     *,
     threshold: float | Threshold | None = None,
     version: str = "v1",
-    backend: Backend | None = None,
+    model: ModelSpec | None = None,
 ) -> _Candidate:
     """Frozen toxicity.v1 questions. A label subset is a different decision profile."""
 
     _checked_version(version, "toxicity.v1")
-    return _publish(toxicity_candidate(labels), threshold=threshold, backend=backend)
+    return _publish(toxicity_candidate(labels), threshold=threshold, model=model)
 
 
 __all__ = [

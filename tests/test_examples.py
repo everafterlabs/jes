@@ -28,7 +28,6 @@ _OFFLINE = (
     "langchain_agent.py",
     "langgraph_agent.py",
     "pii_conversation.py",
-    "backends.py",
     "secrets_canary.py",
     "topics_toxicity.py",
     "custom_questions.py",
@@ -42,9 +41,8 @@ def test_cookbook_names_the_examples() -> None:
     text = COOKBOOK.read_text(encoding="utf-8")
     for name in _OFFLINE:
         assert name in text
-    assert "live_hosted.py" in text
+    assert "live_typesafe.py" in text
     assert "docs/recipes.md" in text
-    assert "docs/migration.md" in text
 
 
 def test_one_check_blocks() -> None:
@@ -142,7 +140,7 @@ def test_async_check_allows() -> None:
 def test_default_answer_fills_missing_questions() -> None:
     result = Guard(
         [toxicity(threshold=0.70)],
-        backend=FakeBackend(
+        model=FakeBackend(
             default_answer=YesNoAnswer(0.0, "probability"),
             answers={"insult": YesNoAnswer(0.9, "probability")},
         ),

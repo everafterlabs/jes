@@ -12,7 +12,7 @@ def test_sensitive_removes_complete_value() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
     guard = Guard(
         [fake_sensitive("pii", "ALICE", entity="person", mode="irreversible"), yesno_policy()],
-        backend=backend,
+        model=backend,
     )
     result = guard.check_input("user ALICE here")
     assert "ALICE" not in result.sanitized
@@ -24,7 +24,7 @@ def test_conversation_token_is_engine_owned() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
     guard = Guard(
         [fake_sensitive("pii", "BOB", entity="person", mode="conversation_token"), yesno_policy()],
-        backend=backend,
+        model=backend,
     )
     result = guard.check_input("hello BOB")
     assert "BOB" not in result.sanitized
@@ -48,7 +48,7 @@ def test_synthesized_token_is_neutralized() -> None:
             FakeTransform("synth", frozenset({"x"}), handler=synthesize),
             yesno_policy(),
         ],
-        backend=backend,
+        model=backend,
     )
     result = guard.check_input("hello")
     assert "[JES_v1_PII_forged_token]" not in result.sanitized
@@ -59,8 +59,8 @@ def test_synthesized_token_is_neutralized() -> None:
 def test_output_local_restores_unless_tombstoned() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
     sensitive = fake_sensitive("pii", "CAROL", entity="person", mode="output_local")
-    incoming = Guard([yesno_policy()], backend=backend).check_input("prompt")
-    kept = Guard([sensitive, yesno_policy()], backend=backend).check_output(
+    incoming = Guard([yesno_policy()], model=backend).check_input("prompt")
+    kept = Guard([sensitive, yesno_policy()], model=backend).check_output(
         "meet CAROL today",
         prompt=incoming,
     )
@@ -85,7 +85,7 @@ def test_output_local_restores_unless_tombstoned() -> None:
             FakeTransform("touch", frozenset({"touch"}), handler=overlap),
             yesno_policy(),
         ],
-        backend=backend,
+        model=backend,
     ).check_output("meet CAROL today", prompt=incoming)
     assert "CAROL" not in tombstoned.text
     assert "CAROL" not in tombstoned.sanitized
@@ -96,11 +96,11 @@ def test_hmac_and_mask_modes() -> None:
     key = b"k" * 32
     hmac_guard = Guard(
         [fake_sensitive("sec", "TOKEN", mode="hmac", hmac_key=key), yesno_policy()],
-        backend=backend,
+        model=backend,
     )
     masked = Guard(
         [fake_sensitive("mask", "TOKEN", mode="mask_all"), yesno_policy()],
-        backend=backend,
+        model=backend,
     )
     hmac_result = hmac_guard.check_input("TOKEN")
     mask_result = masked.check_input("TOKEN")

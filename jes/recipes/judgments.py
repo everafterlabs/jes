@@ -5,8 +5,8 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
-from jes.backends import Backend
 from jes.errors import PolicyError
+from jes.judge import ModelSpec
 from jes.policies import Item, judge
 from jes.policies._protocols import ContextMode
 from jes.policies.judgments import _JudgePolicy
@@ -47,7 +47,7 @@ def _yesno(
     context: ContextMode = "none",
     sources: bool = False,
     whole_text: bool = False,
-    backend: Backend | None = None,
+    model: ModelSpec | None = None,
 ) -> _JudgePolicy:
     return judge(
         name,
@@ -57,7 +57,7 @@ def _yesno(
         context=context,
         sources=sources,
         whole_text=whole_text,
-        backend=backend,
+        model=model,
         version=version,
     )
 
@@ -66,7 +66,7 @@ def sentiment(
     *,
     threshold: float | Threshold,
     version: str = "v1",
-    backend: Backend | None = None,
+    model: ModelSpec | None = None,
 ) -> _JudgePolicy:
     """Yes/no: the text is hostile or strongly negative."""
 
@@ -76,7 +76,7 @@ def sentiment(
         SENTIMENT_V1,
         threshold=threshold,
         version="sentiment.v1",
-        backend=backend,
+        model=model,
     )
 
 
@@ -85,7 +85,7 @@ def emotions(
     *,
     threshold: float | Threshold,
     version: str = "v1",
-    backend: Backend | None = None,
+    model: ModelSpec | None = None,
 ) -> _JudgePolicy:
     """One yes/no question per emotion. The default is the v1 negative set."""
 
@@ -102,7 +102,7 @@ def emotions(
         "emotions",
         questions,
         threshold=threshold,
-        backend=backend,
+        model=model,
         version="emotions.v1",
     )
 
@@ -111,7 +111,7 @@ def gibberish(
     *,
     threshold: float | Threshold,
     version: str = "v1",
-    backend: Backend | None = None,
+    model: ModelSpec | None = None,
 ) -> _JudgePolicy:
     """Yes/no: the text is not meaningful language."""
 
@@ -121,7 +121,7 @@ def gibberish(
         GIBBERISH_V1,
         threshold=threshold,
         version="gibberish.v1",
-        backend=backend,
+        model=model,
     )
 
 
@@ -129,7 +129,7 @@ def bias(
     *,
     threshold: float | Threshold,
     version: str = "v1",
-    backend: Backend | None = None,
+    model: ModelSpec | None = None,
 ) -> _JudgePolicy:
     """Yes/no, output only: the text demeans or stereotypes a group."""
 
@@ -140,7 +140,7 @@ def bias(
         threshold=threshold,
         version="bias.v1",
         stages=("output",),
-        backend=backend,
+        model=model,
     )
 
 
@@ -148,7 +148,7 @@ def refusal(
     *,
     threshold: float | Threshold,
     version: str = "v1",
-    backend: Backend | None = None,
+    model: ModelSpec | None = None,
 ) -> _JudgePolicy:
     """Yes/no, output only: the text refuses the request."""
 
@@ -159,7 +159,7 @@ def refusal(
         threshold=threshold,
         version="refusal.v1",
         stages=("output",),
-        backend=backend,
+        model=model,
     )
 
 
@@ -168,7 +168,7 @@ def language(
     *,
     threshold: float | Threshold,
     version: str = "v1",
-    backend: Backend | None = None,
+    model: ModelSpec | None = None,
 ) -> _JudgePolicy:
     """Choice over allowed language codes plus ``other``. ``other`` violates."""
 
@@ -187,7 +187,7 @@ def language(
         Choice(LANGUAGE_V1, options, task="custom"),
         threshold=threshold,
         violating=("other",),
-        backend=backend,
+        model=model,
         version="language.v1",
     )
 
@@ -196,7 +196,7 @@ def language_same(
     *,
     threshold: float | Threshold,
     version: str = "v1",
-    backend: Backend | None = None,
+    model: ModelSpec | None = None,
 ) -> _JudgePolicy:
     """Yes/no, output, required prompt: the reply is in a different language."""
 
@@ -209,7 +209,7 @@ def language_same(
         stages=("output",),
         context="required",
         whole_text=True,
-        backend=backend,
+        model=model,
     )
 
 
@@ -219,7 +219,7 @@ def code(
     *,
     threshold: float | Threshold,
     version: str = "v1",
-    backend: Backend | None = None,
+    model: ModelSpec | None = None,
 ) -> _JudgePolicy:
     """Choice over a fixed language set plus ``not_code``.
 
@@ -248,7 +248,7 @@ def code(
         Choice(CODE_V1, options, task="custom"),
         threshold=threshold,
         violating=violating,
-        backend=backend,
+        model=model,
         version="code.v1",
     )
 
@@ -262,7 +262,7 @@ def malicious_urls(
     *,
     threshold: float | Threshold,
     version: str = "v1",
-    backend: Backend | None = None,
+    model: ModelSpec | None = None,
 ) -> _JudgePolicy:
     """Judge each absolute http(s) URL string. More than 20 blocks before any call."""
 
@@ -274,7 +274,7 @@ def malicious_urls(
         items=_url_items,
         max_policy_items=_MAX_URLS,
         item_overflow_label="too_many_urls",
-        backend=backend,
+        model=model,
         version="malicious_urls.v1",
     )
 
@@ -283,7 +283,7 @@ def relevance(
     *,
     threshold: float | Threshold,
     version: str = "v1",
-    backend: Backend | None = None,
+    model: ModelSpec | None = None,
 ) -> _JudgePolicy:
     """Yes/no, whole output, required prompt: the reply does not address the prompt."""
 
@@ -296,7 +296,7 @@ def relevance(
         stages=("output",),
         context="required",
         whole_text=True,
-        backend=backend,
+        model=model,
     )
 
 
@@ -304,7 +304,7 @@ def factual_consistency(
     *,
     threshold: float | Threshold,
     version: str = "v1",
-    backend: Backend | None = None,
+    model: ModelSpec | None = None,
 ) -> _JudgePolicy:
     """Yes/no, whole output, required prompt and sources when they are passed."""
 
@@ -318,5 +318,5 @@ def factual_consistency(
         context="required",
         sources=True,
         whole_text=True,
-        backend=backend,
+        model=model,
     )

@@ -12,19 +12,19 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Literal, TypeAlias, cast
 
-from jes.backends import (
-    Backend,
-    BackendResult,
-    BackendUsage,
-    DecisionProfile,
-    RequestProfile,
-)
 from jes.errors import (
     BackendError,
     DeadlineExceeded,
     PolicyError,
     PolicyExecutionError,
     RedactionError,
+)
+from jes.judge import (
+    Backend,
+    BackendResult,
+    BackendUsage,
+    DecisionProfile,
+    RequestProfile,
 )
 from jes.policies._protocols import InterpretationContext, Item, Policy
 from jes.questions import Question

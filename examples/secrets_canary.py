@@ -10,12 +10,12 @@ _SECRET = "sk-" + ("a" * 20)
 
 def main() -> tuple[InputResult, ScanResult]:
     backend = FakeBackend()
-    hidden = Guard([secrets()], backend=backend).check_input(f"token {_SECRET}")
+    hidden = Guard([secrets()], model=backend).check_input(f"token {_SECRET}")
     # The model receives hidden.onward, which has no sk- token.
-    prompt = Guard([], backend=backend).check_input("write a note")
+    prompt = Guard([], model=backend).check_input("write a note")
     leaked = Guard(
         [canary("CANARY-TOKEN")],
-        backend=backend,
+        model=backend,
         fail_fast=False,
     ).check_output("leaked CANARY-TOKEN here", prompt=prompt)
     # leaked.onward is the refusal. The canary is not in it.

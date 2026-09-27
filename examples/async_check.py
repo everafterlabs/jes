@@ -12,7 +12,7 @@ from jes.types import InputResult
 async def check() -> InputResult:
     guard = AsyncGuard(
         [injection(threshold=0.72)],
-        backend=FakeBackend(answers={"violation": YesNoAnswer(0.1, "probability")}),
+        model=FakeBackend(answers={"violation": YesNoAnswer(0.1, "probability")}),
     )
     result = await guard.check_input("Please summarize the notes.")
     # Send result.onward to the model.

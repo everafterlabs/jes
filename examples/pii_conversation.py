@@ -13,7 +13,7 @@ _TOKEN = re.compile(r"\[JES_v1_PII_[A-Za-z0-9_-]+\]")
 def main() -> tuple[InputResult, ScanResult, InputResult, bytes]:
     backend = FakeBackend()
     store = Redactions(scope=b"conversation-1")
-    guard = Guard([pii()], backend=backend)
+    guard = Guard([pii()], model=backend)
     incoming = guard.check_input("email me at ada@example.com", redactions=store)
     reply = f"I will write to {_token(incoming.onward)}."
     outgoing = guard.check_output(reply, prompt=incoming, redactions=store)

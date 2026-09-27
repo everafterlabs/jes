@@ -17,7 +17,7 @@ def main() -> tuple[InputResult, InputResult, InputResult]:
                 stages=("input",),
             )
         ],
-        backend=FakeBackend(answers={"violation": YesNoAnswer(0.9, "probability")}),
+        model=FakeBackend(answers={"violation": YesNoAnswer(0.9, "probability")}),
     ).check_input("Please refund the order.")
     route = Guard(
         [
@@ -32,7 +32,7 @@ def main() -> tuple[InputResult, InputResult, InputResult]:
                 stages=("input",),
             )
         ],
-        backend=FakeBackend(
+        model=FakeBackend(
             answers={"violation": ChoiceAnswer({"billing": 0.7, "other": 0.3}, "probability")},
         ),
     ).check_input("I was charged twice.")
@@ -46,7 +46,7 @@ def main() -> tuple[InputResult, InputResult, InputResult]:
                 stages=("input",),
             )
         ],
-        backend=FakeBackend(
+        model=FakeBackend(
             answers={"violation": ScoreAnswer((0.1, 0.1, 0.8), "probability")},
         ),
     ).check_input("The service is down.")

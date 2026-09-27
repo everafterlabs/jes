@@ -7,8 +7,15 @@ import time
 from collections.abc import Mapping, Sequence
 from functools import partial
 
-from jes.backends import AsyncBackend, Backend, RequestBudget, RequestContext, SyncBackend
 from jes.errors import BackendError, DeadlineExceeded, PolicyError, PolicyExecutionError
+from jes.judge import (
+    AsyncBackend,
+    ModelSpec,
+    RequestBudget,
+    RequestContext,
+    SyncBackend,
+    resolve_judge,
+)
 from jes.policies import Policy
 from jes.redactions import Redactions
 from jes.types import Finding, History, InputResult, ScanResult, Stage
@@ -33,7 +40,7 @@ class AsyncGuard(BaseGuard):
         self,
         policies: Sequence[Policy],
         *,
-        backend: Backend | None = None,
+        model: ModelSpec | None = None,
         fail_fast: bool = False,
         on_backend_error: OnBackendError = "raise",
         max_input_bytes: int = 1_048_576,
@@ -85,7 +92,7 @@ class AsyncGuard(BaseGuard):
         )
         super().__init__(
             policies,
-            backend=backend,
+            backend=resolve_judge(model),
             fail_fast=fail_fast,
             on_backend_error=on_backend_error,
             limits=limits,

@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal, Protocol, TypeAlias, runtime_checkable
 
-from jes.backends import Backend
 from jes.errors import PolicyExecutionError
+from jes.judge import Backend
 from jes.questions import Answer, Question, Threshold
 from jes.redactions import RedactionView
 from jes.types import Action, Finding, FindingLocation, Provenance, ScoreResult, Span, Stage

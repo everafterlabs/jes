@@ -14,7 +14,7 @@ jes is a Python library that checks text on the way into a model, text retrieved
 | Llama Prompt Guard 2 | Low-latency detection of explicit attempts to override an AI system’s instructions (injection and jailbreaks), in user text and in untrusted content |
 | Llama Guard 4 | Safe/unsafe classification against the hazard list S1–S14, for prompts and model replies |
 
-The abilities are **policies**. The models are **backends**. General backends (Laya, Jev, and capability-qualified models through LiteLLM) can answer arbitrary policy questions; Prompt Guard 2 and Llama Guard 4 run only the supported tasks they declare. The caller chooses the backend and passes `threshold=`. A later evaluation may recommend a backend and publish a threshold for one exact measured configuration (section 11). 1.0 does not.
+The abilities are **policies**. One judge answers them: a TypeSafe decision model through LangChain’s `TypeSafeClassifier`. Injection and the S1–S14 hazard list are questions sent to that judge, not separate model adapters. The caller passes `model=` and `threshold=`. A later evaluation may recommend a pinned model id and publish a threshold for one exact measured configuration (section 11). 1.0 does not.
 
 ## 2. Why jes
 
@@ -33,18 +33,18 @@ jes is one policy API over interchangeable judges, including cheap typed-decisio
 
 These hold for v1 unless this document is revised.
 
-1. **Python 3.11+.** The core depends only on `httpx`. No torch in the core.
-2. **Apache-2.0.** Meta weights are never shipped. Local Meta adapters download them under the user’s Hugging Face account.
+1. **Python 3.11+.** The core depends on `langchain-typesafe`. No torch in the core.
+2. **Apache-2.0.** jes ships no model weights.
 3. **One pipeline, five entry points:** `check_input`, `check_untrusted`, `check_output`, `check_tool_call`, and `check_tool_result`. `Guard` and `AsyncGuard` share all planning and interpretation code; only request execution differs.
 4. **Two policy kinds.** Transforms (exact rules and span edits) and judgments (questions for a backend). All transforms run before any judgment, in fixed phases (normalize, detect, limit). Checked text and every context value get a backend-safe projection; a context block that leaves sensitive text in place prevents backend I/O.
-5. **Backends are peers** behind one protocol: System One (Laya, Jev), LiteLLM, Prompt Guard 2, Llama Guard 4. Each backend declares which tasks it can answer.
-6. **Recommendations and defaults are measured.** No backend is recommended and no threshold is a default until evaluation measures the exact request and per-policy decision profiles. A decision configuration that differs from an evaluated profile needs an explicit threshold.
-7. **No silent client-side truncation in strict mode.** Every character of each judgment’s logical subject—the full transformed text or each extracted `Item.text`—is included in at least one payload jes submits, or the check raises or returns a blocking, incomplete result. Actual model consumption is guaranteed only for verified non-truncating local/attested profiles; remote providers may reject or violate their contracts.
+5. **One judge.** The caller passes a TypeSafe model name or a LangChain `TypeSafeClassifier`. jes sends each question as a `Noul`, `Choice`, or `Score` and reads the returned probability. Chat models are not judges.
+6. **Recommendations and defaults are measured.** No model is recommended and no threshold is a default until evaluation measures the exact request and per-policy decision profiles for a pinned TypeSafe model id such as `jev-1.13.0`. A decision configuration that differs from an evaluated profile needs an explicit threshold. `jev-latest` is an alias and never matches a published default.
+7. **No silent client-side truncation in strict mode.** Every character of each judgment’s logical subject—the full transformed text or each extracted `Item.text`—is included in at least one payload jes submits, or the check raises or returns a blocking, incomplete result. jes caps the UTF-8 size of the rendered state. TypeSafe may still reject a request that exceeds its own token limits.
 8. **Redaction stores belong to one conversation.** The caller creates a `Redactions` store per conversation and passes it to each check; a guard never holds one. Stores and results carry immutable random identities. Placeholders are unguessable, authenticated, exact-case tokens, and only tokens authorized by the context of one generation are restored.
 9. **Every built-in yes/no question is phrased so true means violation.** Question text is versioned, selectable, and recorded in findings.
 10. **Completion is explicit.** Results carry both an allow/block decision and whether every configured check completed. Backend failure raises by default; `"block"` fails closed, and the explicit `"allow"` mode returns `complete=False`.
 11. **Text only in v1.**
-12. **Fine-tuning is out of scope.** Callers can point a backend at a fine-tuned checkpoint.
+12. **Fine-tuning is out of scope.** Callers pin a TypeSafe model id. jes does not train or select weights.
 13. **Complete-reply restoration.** Authorized placeholders are restored only after the complete plain-text reply has passed output transforms and judgments. Incremental restoration is deferred until after 1.0.
 14. **Work is bounded.** Raw and normalized byte limits, item and request limits, redaction-store limits, response limits, and guard-wide concurrency limits apply before attacker-controlled work can grow without bound.
 
@@ -130,23 +130,14 @@ check_tool_result(text, name, prompt=None, redactions=None)          → ScanRes
 
 Planning and interpretation do no I/O. `Guard` and `AsyncGuard` differ only in how they execute the planned backend requests.
 
-In LLM Guard every check owns a model — more than a dozen Hugging Face models across the catalog — and 14 of its 22 output scanners are wrapper classes around input scanners. In jes a judgment is a set of questions plus an interpretation; compatible policies may share a backend request, while policy-atomic partitions preserve interpretation and threshold identity.
-
-| Backend | Answers | Runs |
-| --- | --- | --- |
-| `SystemOne` | Any typed question | Laya through `laya-serve` or in-process, hosted Jev, any compatible endpoint |
-| `LiteLLMJudge` | Any typed question | Any model LiteLLM can call, hosted or local (Ollama, vLLM) |
-| `PromptGuard2` | `injection` only | In-process, or a provider-specific classifier endpoint with a fixture-backed profile |
-| `LlamaGuard4` | `hazard.any` and `hazard.S1`–`hazard.S14` only | A fixture-backed chat endpoint (for example Groq or vLLM) or in-process |
+In LLM Guard every check owns a model — more than a dozen Hugging Face models across the catalog — and 14 of its 22 output scanners are wrapper classes around input scanners. In jes a judgment is a set of questions plus an interpretation. Policies that share a model and the same context rules share one TypeSafe request. Each policy keeps its own threshold.
 
 Where checked text goes:
 
 | Component | Destination |
 | --- | --- |
 | Transforms (regex, substrings, invisible text, Presidio, detect-secrets) | Local process |
-| `SystemOne.in_process`, local `PromptGuard2` and `LlamaGuard4` | Local process |
-| `SystemOne.local` pointed at localhost | Local machine |
-| `SystemOne.hosted`, endpoint adapters, `LiteLLMJudge` | The configured host, after transforms |
+| The TypeSafe classifier passed to `Guard` | TypeSafe, after transforms |
 
 The README shows this table in the quickstart.
 
@@ -156,7 +147,6 @@ The README shows this table in the quickstart.
 
 ```python
 from jes import Guard
-from jes.backends import SystemOne
 from jes.policies import (
     hazards,
     indirect_injection,
@@ -179,12 +169,7 @@ guard = Guard(
         hazards(threshold=0.8),
         topics(["medical advice"], threshold=0.7),
     ],
-    backend=SystemOne.local(
-        "http://127.0.0.1:8000",
-        model="english",
-        revision="pinned-checkpoint-revision",
-        artifact_digest="sha256:…",
-    ),
+    model="jev-latest",
 )
 
 incoming = guard.check_input(user_text)
@@ -703,9 +688,9 @@ Answer = YesNoAnswer | ChoiceAnswer | ScoreAnswer
 ```
 
 - The top choice and the expected score level are computed properties, not stored fields.
-- Scores are finite numbers in [0, 1]. Choice keys must equal the options, and choice and ordered-level scores must sum to 1 ± 1e-3. A `label` answer is one-hot. A `probability` answer is a backend probability or a documented normalization over candidates. A `verbalized` answer is a distribution written by the model. Violations raise `BackendError`.
-- Task ids: `custom`, `injection`, `indirect_injection`, `hazard.any`, `hazard.S1` through `hazard.S14`, `topic`, `toxicity.<label>`. General backends (`tasks=None`) answer any task from the instruction text. Fixed-task backends answer only the tasks they list and ignore instruction text.
-- `YesNo` is the name System One calls `noul`; the System One adapter maps it on the wire.
+- Scores are finite numbers in [0, 1]. Choice keys must equal the options, and choice and ordered-level scores must sum to 1 ± 1e-3. The TypeSafe judge records every answer as `kind="probability"`. A `label` answer is one-hot. A `verbalized` answer is a distribution written by a model; the current judge does not produce one. Violations raise `BackendError`.
+- Task ids: `custom`, `injection`, `indirect_injection`, `hazard.any`, `hazard.S1` through `hazard.S14`, `topic`, `toxicity.<label>`. The TypeSafe judge answers any of them from the instruction text.
+- `YesNo` is sent to TypeSafe as a `Noul`. `Choice` and `Score` use the same names.
 
 **Violation score** is the number compared to thresholds and reported in `scores`:
 
@@ -734,7 +719,7 @@ class Threshold:
 
 For each policy in that request, construction computes a `DecisionProfile`. It adds policy kind/version/subset, stage, question and answer-kind schema, interpretation version, and merge version to the request-profile hash. `jes/policies/defaults.py` maps each decision-profile fingerprint—not a shared request fingerprint—to one threshold and evaluation run id. The table is empty in 1.0. A bundled request therefore resolves a threshold vector keyed by policy name.
 
-Any decision-profile mismatch requires an explicit threshold. That includes a floating model, different policy subset, changed transforms/question partition/chunk rules, provider/template/scorer, or interpretation/merge version. Recipes and `judge()` always require explicit thresholds. Examples pin immutable weight revisions or digests (`laya:english@hf:<commit>#sha256:<digest>`, `jev-1.13.0`, or an Ollama digest); aliases such as `jev-latest` never match.
+Any decision-profile mismatch requires an explicit threshold. That includes a different TypeSafe model id, policy subset, transform set, question partition, chunk rules, or interpretation/merge version. Recipes and `judge()` always require explicit thresholds. A published default is pinned to a versioned id such as `jev-1.13.0`. The alias `jev-latest` never matches.
 
 ### 7.5 Errors
 
@@ -813,7 +798,7 @@ class Redactions:
 - Scope and associated data are non-empty and bounded before hashing or allocation. `dumps` requires a 32-byte key from `[crypto]`; its canonical format includes a fixed-size envelope/header plus bounded plaintext (version, scope digest, store id, limits, entries, secret). AES-256-GCM uses a fresh 96-bit nonce and authenticates every header plus associated data. `loads` rejects oversized scope/AAD/blob before decryption, then refuses embedded entry/value/plaintext limits above caller ceilings and rejects unknown versions, scope mismatch, or authentication failure. The default blob cap is the plaintext cap plus a fixed 4 KiB envelope allowance. Key rotation and replay counters are caller responsibilities.
 - Store mutations take a short internal lock; jes never holds it across a transform or backend I/O. One call-scoped transaction stages every allocation, performs a read-only prospective cap/collision check before backend scheduling, then commits only for a complete allowed result. Final commit rechecks for concurrent changes. Concurrent insertion of the same value computes the same token; an impossible HMAC-id collision with another value blocks atomically. A closed or timed-out transaction rejects late operations. Entries are immutable after insertion, so a check snapshots its authorized map before releasing the lock. Stores, transactions, authority manifests/snapshots, and output-local maps have redacted `repr` and reject pickle, JSON, copy, and deepcopy.
 
-## 8. Backends
+## 8. Judge
 
 ### 8.1 Protocol
 
@@ -966,177 +951,51 @@ class AsyncBackend(Backend, Protocol):
 - Each backend renders `State` for its model. The engine never builds prompt strings.
 - `max_attempts >= 1` is immutable, fingerprinted in canonical capabilities, and includes the initial call. `partition_questions` is pure and depends only on the immutable backend profile/static schema. A partition may split only between policy namespaces; every question for one policy stays together. If one policy’s set cannot fit, construction raises. Backends expose every deterministic split at construction and never exceed `max_attempts` inside `decide`/`adecide`.
 - `decide` returns exactly one answer per question id plus immutable private usage for every physical provider request. Usage never lives in mutable backend “last response” state.
-- Built-in HTTP backends implement both `decide` and `adecide` on top of shared, pure request and response code. In-process backends implement `decide`, and `AsyncGuard` runs it in a worker thread.
-- The engine sends a request only when its `headroom` is 0 or more. Headroom is recomputed on the complete combined question batch after rendering, so text that grows when escaped (JSON turns one control character into six) cannot push the submitted payload past the adapter’s declared limit.
-- Before every provider call—including a retry—the backend enters `request.budget.acquire(..., logical_index=..., attempt=...)` or `aacquire`. `RequestPermit` and `BackendUsage` are public backend-extension types, but their opaque permit id is never copied into `ScanResult`. The engine verifies it, then assigns canonical public `Usage.request` indices by logical/attempt slot.
-- `RequestContext.deadline` is cooperative for custom sync code. Built-in transports derive every connect/read/write timeout and retry sleep from the remaining time. `AsyncGuard` may stop awaiting a custom sync callback at the deadline, but the callback can continue in its worker; the docs make that limitation explicit and never claim thread cancellation.
-- Built-in HTTP adapters stream and count success and error bodies and stop at `max_response_bytes` before buffering or parsing; overflow emits `response_too_large` and is a strict resource block. Custom backends receive the cap in `RequestContext` and must pass its contract test to claim bounded behavior.
-- The mappings in capabilities and profiles are defensively copied into immutable views. `BackendProfile` has no caller-settable verification flag. Closed built-in adapter factories register `_ProfileAttestation` in an engine-owned identity registry that public/custom objects cannot populate: verified installed bytes, a shipped immutable provider registry entry, or a deployment manifest signed by a configured trusted key and matched by handshake. The registry supplies `RequestProfile.attestation_digest`. Custom backends are explicit-threshold-only in v1; caller labels or private-looking attributes never qualify.
-- `jes.testing.check_backend_contract(backend)` checks deterministic partitioning, answer coverage, permit use for retries/splits, immutable per-call usage, task-specific score kinds, capability limits, deterministic rendering, exact or conservative headroom on control characters/emoji/quotes, and deadline cooperation. Every built-in backend passes it.
+- The TypeSafe judge implements both `decide` and `adecide`. `FakeBackend` does the same for tests.
+- The engine sends a request only when its `headroom` is 0 or more. Headroom is the configured byte budget minus the UTF-8 size of the rendered state and a small output reserve.
+- Before every provider call the judge enters `request.budget.acquire(..., logical_index=..., attempt=...)` or `aacquire`. `RequestPermit` and `BackendUsage` carry a permit id that is never copied into `ScanResult`. The engine verifies it, then assigns canonical public `Usage.request` indices.
+- `RequestContext.deadline` is checked before the classifier call. Past it, the judge raises `DeadlineExceeded`. The classifier’s own HTTP timeout is the one configured on `TypeSafeClassifier`.
+- The TypeSafe judge does not cap provider response bytes. Transport limits belong to the classifier.
+- The mappings in capabilities and profiles are copied into immutable views. The judge’s profile records the TypeSafe model name and the `langchain-typesafe` version. `RequestProfile.attestation_digest` is empty: a model name is not an attested artifact. `jev-latest` cannot receive a published default.
+- `jes.testing.check_backend_contract` checks partitioning, answer coverage, permit use, usage, rendering, headroom, and deadline cooperation for `FakeBackend`.
 
-### 8.2 Token budgets
+### 8.2 Budgets
 
-- A constructor accepts a total `context_window_tokens` or an attested provider total, never a “text budget.” `headroom` derives usable subject space by rendering state, questions, answer format, escaping, templates and special tokens, then reserving completion tokens.
-- An `exact` profile uses a pinned tokenizer and pinned chat template: the `[tokenizers]` extra for Laya checkpoints, or the model’s own pinned tokenizer for in-process adapters.
-- A `conservative` profile counts UTF-8 bytes after rendering and compares them with an explicit conservative payload budget. It guarantees only what jes submits; a remote provider may add hidden template tokens and reject the request. Such a profile cannot receive a default threshold unless that exact provider profile was live-tested and evaluated.
-- A verified remote profile also attests that server-side truncation is disabled and over-limit requests fail rather than silently truncate. Without that evidence, the profile can guarantee submitted-payload coverage only and is ineligible for the stronger model-consumption claim.
-- jes always sends an explicit Laya checkpoint name, so `laya-serve`’s router never picks a checkpoint with a smaller window.
-- Any model not in the table below requires either a pinned tokenizer/template plus total context profile or a conservative `max_request_bytes=` contract. Output reserve is mandatory.
+- The judge counts UTF-8 bytes of the rendered state and compares them with `max_request_bytes` (default 1,048,576), minus a small output reserve. That cap is what jes submits. It is not Jev’s token window.
+- TypeSafe documents its own limits for `jev-1.13`: about 32,000 tokens for the state plus the longest question, and 64,000 for the state and every question together. jes does not enforce those token caps. A request past them fails at the API.
+- `headroom` is recomputed on the rendered state. Text that grows when escaped cannot slip past the byte cap unnoticed, because the cap is counted on the string that is sent.
+- `jev-latest` is an alias that moves when TypeSafe ships a release. A measured threshold is pinned to a versioned id such as `jev-1.13.0`.
 
-| Backend model | Total context / nominal state share | Basis |
-| --- | --- | --- |
-| Laya `english` | 512 total / about 320 state | 192-token question head; exact adapter headroom also counts model special tokens |
-| Laya `multilingual` | 1,024 total / about 768 state | 256-token question head; exact adapter headroom also counts model special tokens |
-| Laya `typed-decisions` | 1,024 total / about 768 state | 256-token question head; exact adapter headroom also counts model special tokens |
-| Jev `jev-1.13.0` | 32,000 tokens minus the longest question; state plus all questions at most 64,000 | TypeSafe’s documented limits |
-| Prompt Guard 2 (22M, 86M) | 512 total | Model card; classifier special tokens reduce subject headroom |
-| Llama Guard 4 | Provider/model total (131,072 on Groq) | Conversation template, category text, special tokens, and completion reserve reduce subject headroom |
-
-The manual live-test job checks each entry against a real server.
-
-### 8.3 System One
+### 8.3 TypeSafe judge
 
 ```python
-SystemOne.local(
-    base_url="http://127.0.0.1:8000",
-    model="english",
-    provider_profile="laya-serve.v1",
-    revision=None,
-    artifact_digest=None,
-    deployment_manifest=None,
-    trusted_manifest_keys=(),
-    api_key=None,
-    context_window_tokens=None,
-    max_request_bytes=None,
-    timeout_s=5.0,
-)
-SystemOne.hosted(
-    model="jev-1.13.0",
-    base_url="https://api.typesafe.ai",
-    api_key=None,
-    provider_profile="typesafe.jev.v1",
-    timeout_s=10.0,
-)
-SystemOne.in_process(
-    checkpoint="english",
-    provider_profile="laya.in_process.v1",
-    revision=None,
-    artifact_digest=None,
-)   # extra [laya]
-```
+from langchain_typesafe import TypeSafeClassifier
 
-- `local` and `hosted` share one HTTP client. `hosted` reads `TYPESAFE_API_KEY` when `api_key` is `None` and sends `Authorization: Bearer`. `local` sends a key only when given one (matching `LAYA_API_KEY` on the server).
-- `in_process` calls the `laya` package directly, using the same request and response mapping.
-- The backend profile records every field in section 8.1. `in_process` hashes and verifies installed checkpoint metadata. Stock `laya-serve` reports a serving alias/model but not an artifact digest, so `SystemOne.local` has no attestation unless a controlled deployment manifest covers laya/laya-serve variants/versions, checkpoint commit/digest, tokenizer/config, total/head budgets, aliases, truncation behavior, and server configuration; verifies against `trusted_manifest_keys`; and matches a live handshake. Caller labels or self-signed manifests without a configured trust key never qualify.
-- Known verified Laya profiles fill `context_window_tokens`; unknown models require a pinned tokenizer/template with a total context or `max_request_bytes`. Supplying incompatible budget modes is an error.
-- The adapter renders the state to a string itself and sends that string: the text alone when only `text` is present, otherwise compact JSON (`ensure_ascii=False`) with the keys `text`, `prompt`, `question`, `sources`, and `history`. Headroom is counted on that string, so the model sees exactly what was measured.
-- Built-in questions refer to those keys by name, so key names are part of each prompt version.
-- Request: `{"model", "state", "questions": {id: {"type", "instructions", "criteria"}}}`. A `YesNo` becomes type `noul`, with criteria describing `true` and `false`; choice criteria map option labels to descriptions; score criteria list the levels. Hosted Jev posts that body to `/v1/systemone`. Local System One posts it to `/v1/decide`.
-- Response: `answers[id]` carries the yes/no probability, choice probabilities, or ordered-level probabilities plus optional confidence. Hosted Jev names those fields `noul` and `probabilities`. Local fixtures name them `score` and `scores`. The parser accepts both. The verified provider profile—not an untrusted response field—assigns `kind="probability"`. The parser returns `BackendResult`; each permitted provider call contributes private usage that the engine validates and converts to canonical public `Usage`.
-- `max_attempts=3`: initial call plus up to 2 retries on 429/5xx, with exponential backoff and jitter within the deadline. No retry on other 4xx. Deadline-derived timeouts raise `DeadlineExceeded`.
-- `partition_questions` splits a Jev logical batch before chunking when its questions would exceed the 64,000-token request limit. Each planned partition is headroom-checked and each attempt acquires its own request permit.
-- System One answers are `kind="probability"` when the verified wire profile supplies calibrated distributions. Laya’s multilingual checkpoint ships without fitted calibration; evaluation measures it separately.
+from jes import Guard
+from jes.policies import injection
 
-### 8.4 LiteLLM judge
-
-```python
-LiteLLMJudge(
-    "ollama/llama3.1:8b",
-    mode="logprobs",
-    provider="ollama",
-    provider_profile="ollama.chat.v1",
-    revision="sha256:…",
-    tokenizer_revision="llama3.1@…",
-    template_revision="ollama-chat@…",
-    context_window_tokens=8192,                   # optional application cap on the total window
-    max_request_bytes=None,
-    top_logprobs=5,
-    timeout_s=10.0,
-    num_retries=0,
-    fallbacks=None,
-    cache=False,
-    http_client=None,                             # jes injects a bounded client by default
-    completion_fn=None,
+Guard([injection(threshold=0.50)], model="jev-latest")
+Guard(
+    [injection(threshold=0.50)],
+    model=TypeSafeClassifier(
+        model="jev-1.13.0",
+        api_key=None,   # otherwise TYPESAFE_API_KEY
+        base_url=None,  # otherwise TYPESAFE_BASE_URL, default https://api.typesafe.ai
+    ),
 )
 ```
 
-- The system message holds the questions and answer format. The user message holds only rendered state fields. A delimiter is derived deterministically from the canonical request hash and a counter; the adapter increments until the delimiter is absent from every field. This is reproducible for caching and still prevents text from closing its own block.
-- `mode` is required and fixed at construction. It is part of the backend profile; jes never switches modes per response.
-- **`mode="logprobs"`**: the provider capability profile must state its supported `top_logprobs` range and supply a pinned tokenizer. Construction verifies that every answer label is one token in every accepted leading-space form and that the complete candidate set fits the provider limit. LiteLLM’s portable interface documents at most five; a provider-specific profile may document another verified limit. There is no universal `max_options=20`.
-- At runtime every candidate must be present at its answer position. The adapter sums documented token variants and renormalizes over the complete candidate set; the pre-normalization candidate mass is `confidence`. Missing candidates, a response without log-probabilities, or mass below 0.5 raises `BackendError`. This score is a candidate-normalized probability, not an unconditional model probability, and is calibrated only under its exact profile.
-- **`mode="verbalized"`**: the model writes a score distribution for each question. Answers have `kind="verbalized"`, and evaluation reports them separately. Use it for providers that return no log-probabilities (Groq, Anthropic) and for models that reason before answering, such as gpt-oss-safeguard.
-- `max_attempts=2`: temperature 0 where accepted; strict parsing; one jes-scheduled retry for unknown/missing/malformed answers, then `BackendError`.
-- LiteLLM-internal retries, fallbacks, hedging, routing failover, and caching are disabled. The one documented parse retry is scheduled by jes and acquires another permit. Supported LiteLLM versions must accept jes’s decoded-body-capped httpx transport; otherwise construction fails. `completion_fn` replaces model completion in parser tests but does not substitute for separate transport-cap tests.
-- `revision=` must name an immutable provider version or digest. It is sent when the provider supports pinning and verified from response metadata when available; caller-only labels that cannot be verified make the profile ineligible for defaults.
-- `completion_fn` replaces the LiteLLM call in tests.
-
-### 8.5 Prompt Guard 2
-
-```python
-PromptGuard2.endpoint(
-    base_url="https://provider.example/v1",
-    model="meta-llama/llama-prompt-guard-2-86m",
-    provider_profile="provider.prompt_guard_2.v1",
-    revision="immutable-provider-revision",
-    tokenizer_revision="prompt-guard-2@…",
-    api_key=None,
-    context_window_tokens=512,
-)
-PromptGuard2.local(
-    "meta-llama/Llama-Prompt-Guard-2-86M",
-    provider_profile="transformers.sequence_classification.v1",
-    revision="pinned-hugging-face-revision",
-    artifact_digest="sha256:…",
-)   # extra [prompt-guard]
-```
-
-- `tasks={"injection"}`. Renders only `state.text`.
-- Its model card includes explicit attempts in user text and in untrusted third-party data that try to supersede existing instructions, plus jailbreak techniques. jes therefore routes `injection` at both the input and untrusted stages. It does not route the broader `indirect_injection` policy, which also asks whether benign-worded text is addressed to an assistant; that narrower routing is a measured jes decision, not a claim that the model card excludes third-party injection.
-- Local mode returns `kind="probability"` from softmax over the malicious class, with the label id read from pinned model config. There is no standard OpenAI-compatible classifier response. Endpoint support exists only for a named provider profile whose request, response, score kind, limits, and immutable revision were captured in fixtures; otherwise construction fails.
-- Local mode has `max_attempts=1`; each endpoint profile declares and tests a fixed total attempt bound.
-- The 22M checkpoint is the English option; 86M is multilingual.
-
-### 8.6 Llama Guard 4
-
-```python
-LlamaGuard4.endpoint(
-    base_url="https://api.groq.com/openai/v1",
-    model="meta-llama/llama-guard-4-12b",
-    provider_profile="groq.llama_guard_4.v1",
-    revision="immutable-provider-revision",
-    tokenizer_revision="llama4@…",
-    template_revision="groq-llama-guard-4@…",
-    api_key=None,
-    logprobs=False,                                  # Groq returns no log-probabilities
-    context_window_tokens=131_072,
-)
-LlamaGuard4.endpoint(
-    base_url="http://127.0.0.1:8001/v1",             # vLLM
-    model="meta-llama/Llama-Guard-4-12B",
-    provider_profile="vllm.llama_guard_4.v1",
-    revision="pinned-hugging-face-revision",
-    artifact_digest="sha256:…",
-    template_revision="llama-guard-4@…",
-    logprobs=True,
-    context_window_tokens=None,                      # read and verified from model config
-)
-LlamaGuard4.local(
-    "meta-llama/Llama-Guard-4-12B",
-    provider_profile="transformers.causal_lm.v1",
-    revision="pinned-hugging-face-revision",
-    artifact_digest="sha256:…",
-)   # extra [llama-guard]
-```
-
-- `tasks` is `hazard.any` and `hazard.S1` through `hazard.S14`. The adapter renders history, `prompt` as the user turn, and `text` as the turn being classified (the assistant turn on output, the user turn on input).
-- When the provider accepts a custom category list, the adapter sends only the categories the policy asked for. Otherwise it classifies all categories and drops the rest.
-- With `logprobs=True`, construction verifies the pinned tokenizer’s `safe` and `unsafe` candidate forms. `hazard.any` is their normalized first-token score on every request, including a generated `safe`, and has `kind="probability"`. A missing candidate raises. Category answers remain `kind="label"`: 1.0 for listed codes and 0.0 for the rest. Score kind is answer-specific, never backend-wide.
-- With `logprobs=False`, `hazard.any` and category answers are labels. Groq currently returns no log-probabilities for this model; use a verified vLLM or local profile for probability scores. Probability and label profiles are evaluated and thresholded separately.
-- Local mode has `max_attempts=1`; each endpoint profile declares and tests a fixed total attempt bound.
-- Output parsing: `safe`, or `unsafe` followed by comma-separated codes. Unknown codes raise `BackendError`.
-- Llama Guard can itself be jailbroken; also run `injection` on the same text.
-- “About 24 GB” is only the BF16 weight size, not a runtime memory promise; KV cache, framework overhead, and long context require more. The docs report measured hardware per evaluated local profile.
-- The adapter docs point to the Llama 4 Community License and its attribution requirements. jes itself distributes no Llama materials.
+- The classifier is LangChain’s `TypeSafeClassifier` from `langchain-typesafe`. The class is marked beta, so its constructor may change.
+- `TYPESAFE_API_KEY` is required when `api_key` is omitted. `TYPESAFE_BASE_URL` overrides `https://api.typesafe.ai`. Requests go to `/v1/systemone`.
+- Checked text is the state. When the state is only `text`, jes sends that string. Otherwise it sends compact JSON (`ensure_ascii=False`) with `text`, `prompt`, `question`, `sources`, `history`, and `tool` when a tool is present. Questions are not written into that string. Headroom is counted on the same string.
+- Mapping, one TypeSafe question per jes question, under the same id:
+    - `YesNo` becomes a `Noul`. Optional `true` and `false` strings become `NoulCriteria`. The answer `noul` is the probability of yes, which for a built-in policy is the probability of a violation. There is no separate confidence.
+    - `Choice` becomes a `Choice`. Option labels and descriptions are the criteria. The answer carries a probability for every option and a `confidence` derived from that distribution.
+    - `Score` becomes a `Score`. The ordered level strings are the criteria, numbered from zero. The answer carries a probability for every level and a `confidence`.
+- jes records every one of those answers as `kind="probability"`. The violation score compared with the threshold is the yes probability, the sum of the violating option probabilities, or the sum of the level probabilities at or above the violation level.
+- One classifier call answers every question in a planned batch. `Usage` is the reported input and output token counts.
+- Transport failures become `BackendError`. The classifier owns HTTP, retries, and response size. jes does not cap the response body and does not suppress the provider’s logs.
+- A policy may pass its own `model=`. Policies that share one classifier instance and the same context rules are batched.
 
 ## 9. Engine rules
 
@@ -1329,8 +1188,8 @@ Recipes cover the rest of LLM Guard’s catalog. They are built only from public
 | PromptInjection | `injection`, `indirect_injection` | Core judgment |
 | BanTopics | `topics` | Core judgment |
 | Toxicity | `toxicity` | Core judgment |
-| Llama Prompt Guard 2 | `injection` with the `PromptGuard2` backend | Core judgment |
-| Llama Guard 4 | `hazards` with any backend, including `LlamaGuard4` | Core judgment |
+| Llama Prompt Guard 2 | `injection`, judged by TypeSafe | Core judgment |
+| Llama Guard 4 | `hazards` (S1–S14), judged by TypeSafe | Core judgment |
 | BanCompetitors | `recipes.competitors` | Recipe |
 | ReadingTime | `recipes.reading_time` | Recipe |
 | JSON | `recipes.json_check` | Recipe |
@@ -1349,9 +1208,9 @@ Recipes cover the rest of LLM Guard’s catalog. They are built only from public
 
 ## 11. Evaluation
 
-This section is the rule for a later release that publishes a default. 1.0 does not publish one, and it does not recommend a backend. The harness and `evals/protocol.md` are in the tree. One Jev development run was recorded. Selection, calibration, and the sealed audit were not opened.
+This section is the rule for a later release that publishes a default. 1.0 does not publish one, and it does not recommend a model. The harness and `evals/protocol.md` are in the tree. One Jev development run was recorded. Selection, calibration, and the sealed audit were not opened.
 
-When a release does publish a default, that evaluation recommends request profiles and supplies thresholds for exact per-policy decision profiles. It never silently selects a backend at runtime.
+When a release does publish a default, that evaluation recommends a pinned TypeSafe model id and supplies thresholds for exact per-policy decision profiles. It never silently selects a model at runtime.
 
 - **Location:** `evals/` in the repository, not in the package.
 - **Data:** datasets are downloaded at run time from pinned revisions. Licenses, provider terms, allowed hosted processing, and retention constraints are recorded in `evals/datasets.toml` and reviewed before use, since several popular safety sets are non-commercial. Raw texts are never committed; published results are aggregate numbers only.
@@ -1366,14 +1225,9 @@ When a release does publish a default, that evaluation recommends request profil
     - PII detection: recall and precision per entity type for `pii`, with `ner="spacy"` and with a transformer model, including joiner and variation-selector evasions.
 - **Discipline:** development explores models. v1 question bytes are frozen, so later development data does not retune them; a wording change is a new version id. A selection split ranks request/decision-profile candidates; calibration fits thresholds for the selected candidates; and a sealed audit split is opened once for final acceptance. If a candidate fails audit, it gets no default; trying another requires fresh holdout data. Every split is grouped by source document or dataset-defined group, never row. Near-duplicates, padded variants, and one template family stay together. Known training contamination is reported separately.
 - **Repeated releases:** sealed audit data is never used to pick wording, models, ranking, or thresholds and is not repeatedly reused for changed profiles. Any changed prompt, transform, planner/interpreter/merge version, adapter/provider/model/dependency, tokenizer/template, generation setting, question partition, budget, or threshold uses a fresh rolling holdout for acceptance; historical data is comparability-only.
-- **Backends:**
-    - immutable Laya `english` and `multilingual` artifacts in process or through a controlled manifest-attested `laya-serve` deployment, and a pinned Jev provider profile;
-    - gpt-oss-safeguard through LiteLLM verbalized mode, because it classifies against a policy written at inference time;
-    - at least one hosted and one local LiteLLM profile, with logprob and verbalized modes treated as different profiles;
-    - pinned Prompt Guard 2 22M and 86M local artifacts, plus endpoint profiles only after provider-specific fixtures exist;
-    - pinned Llama Guard 4 profiles, with answer-specific probability and label scores reported separately.
-- **Operational completeness:** every attempted check contributes to denominators. Reports include completion rate and counts/rates for transport errors, timeouts, malformed answers, missing logprob candidates, retries, and resource blocks. The evaluation runner uses `on_backend_error="block"` for operational safety metrics, so an incomplete check counts as a block; a parallel raise-mode diagnostic classifies the underlying error. Model-only conditional metrics may be secondary but never replace operational metrics. A logprob profile whose valid response omits a required candidate is unsupported rather than filtered.
-- **Metrics per (policy, decision profile):** independent-group and row counts; ROC AUC and PR AUC for non-label scores; catch rate at 1% and 5% false-positive rate; false-positive rate at 95% catch rate; false-positive rate by text length; expected calibration error by score kind; uncached latency p50/p95; physical requests/retries per check; completion/error rates; and public cost. Label-only profiles report their operating point rather than meaningless curves.
+- **Models:** finalists are pinned TypeSafe model ids, such as `jev-1.13.0`. `jev-latest` is not a finalist, because the alias moves. Every score from the judge is `kind="probability"`. There is no verbalized mode and no logprob mode.
+- **Operational completeness:** every attempted check contributes to denominators. Reports include completion rate and counts/rates for transport errors, timeouts, malformed answers, and resource blocks. The evaluation runner uses `on_backend_error="block"` for operational safety metrics, so an incomplete check counts as a block; a parallel raise-mode diagnostic classifies the underlying error. Model-only conditional metrics may be secondary but never replace operational metrics.
+- **Metrics per (policy, decision profile):** independent-group and row counts; ROC AUC and PR AUC; catch rate at 1% and 5% false-positive rate; false-positive rate at 95% catch rate; false-positive rate by text length; expected calibration error; uncached latency p50/p95; physical requests per check; completion/error rates; and public cost.
 - **Uncertainty:** rates and AUCs use cluster-aware intervals over the independent split group, never row bootstrap. `evals/protocol.md` pre-registers power-derived minimum row and independent-cluster counts for benign, positive, and category subgroups; meeting 10,000 rows alone is never sufficient. Recommendation comparisons use a pre-registered simultaneous-confidence procedure such as Holm correction, with every support count and interval published.
 - **Pre-registration:** `evals/protocol.md` accepts the target false-positive rate of 1%, the operational failure treatment, profile ranking, minimum independent-group support, simultaneous audit procedure, and tie-breakers. The development cohort has been inspected, so those rules stay fixed for that split. Selection data ranks candidates and freezes a finalist set before audit. The sealed audit accepts or rejects that set with simultaneous one-sided bounds and never reranks or substitutes a failed finalist; a new candidate needs fresh holdout data. If none qualifies, recommend none.
 - **Default thresholds:** on calibration, enumerate observed score cutoffs and choose the lowest threshold whose cluster-aware one-sided 95% upper false-positive bound meets the target. The exact decision profile spans its evaluated policy, stage, question set, interpretation, and merge behavior. Sealed audit/fresh rolling holdout must independently pass. Defaults are block-only (`flag_at=None`); a flag band needs its own protocol. Any decision-profile mismatch requires another evaluation or explicit threshold.
@@ -1396,15 +1250,8 @@ jes/
   questions.py           # YesNo, Choice, Score, answers, validation
   redactions.py          # Redactions, token authority, complete-reply URI policy
   testing.py             # FakeBackend, check_backend_contract
+  judge.py               # TypeSafeClassifier adapter, profiles, request metadata
   py.typed
-  backends/
-    __init__.py          # Protocols, profiles/results/usage, SystemOne, LiteLLMJudge, PromptGuard2, LlamaGuard4
-    _profiles.py         # BackendProfile and verified deployment manifests
-    _tokens.py           # token counters
-    system_one.py
-    litellm_judge.py
-    prompt_guard.py
-    llama_guard.py
   policies/
     __init__.py          # core factories and judge()
     _protocols.py        # TransformPolicy, JudgmentPolicy
@@ -1428,7 +1275,7 @@ evals/
 tests/
 ```
 
-The core depends only on `httpx`. Everything else is an extra, imported inside the module that needs it, so `import jes` works with the core alone. Endpoint adapters can operate without model weights in conservative byte-budget mode; an exact verified endpoint profile needs `[tokenizers]` unless the attested provider contract supplies equivalent token-count metadata.
+The core depends on `langchain-typesafe`. Policy extras are imported inside the module that needs them, so a check that does not use PII does not import Presidio.
 
 | Extra | Brings | Used by |
 | --- | --- | --- |
@@ -1438,20 +1285,15 @@ The core depends only on `httpx`. Everything else is an extra, imported inside t
 | `pii-ner` | presidio-analyzer[transformers], presidio-anonymizer, idna, transformers, torch, paired spaCy model | `pii(ner=<model id>)` |
 | `crypto` | cryptography | `Redactions.dumps` and `loads` |
 | `tokens` | tiktoken | `token_limit` |
-| `tokenizers` | tokenizers | Exact token counts for Laya checkpoints |
-| `laya` | laya | `SystemOne.in_process` |
-| `litellm` | litellm | `LiteLLMJudge` |
-| `prompt-guard` | transformers, torch | `PromptGuard2.local` |
-| `llama-guard` | transformers, torch | `LlamaGuard4.local` |
 | `json` | json-repair | `recipes.json_check(repair=True)` |
 
 Tooling: uv for environments and the lockfile, hatchling, ruff, pyright in strict mode on `jes/` and `evals/`, pytest with hypothesis.
 
-API-sensitive extras have tested compatibility bounds in `pyproject.toml`, established from fixtures before their milestone. The uv lock records exact CI versions, but defaults do not rely on the lock alone: each request profile records exact installed versions and asset hashes for jes planner/renderer, httpx serialization, regex, detect-secrets/plugins, tiktoken, Presidio, spaCy model, idna data, LiteLLM, Laya, transformers, torch, tokenizers, and model packages as applicable. A different behavior-affecting version cannot reuse a default until that exact profile is evaluated.
+The uv lock records exact CI versions. A published default records the TypeSafe model id and the `langchain-typesafe` version in the request profile. A different model id cannot reuse that default.
 
 ## 13. Testing
 
-- The engine and policies are tested with `jes.testing.FakeBackend`, which returns registered answers and records every `State` and question it receives. No network and no GPU.
+- The engine and policies are tested with `jes.testing.FakeBackend`, which returns registered answers and records every `State` and question it receives. The TypeSafe mapping is tested with a scripted classifier that implements `invoke` and `ainvoke`. No network and no GPU.
 - Property tests (hypothesis):
     - chunks cover every character of each full-text or item logical subject, every chunk advances, and every finalized request fits its complete rendered payload, including control characters, emoji, and quotes;
     - merging never lowers a score or softens an action;
@@ -1459,8 +1301,8 @@ API-sensitive extras have tested compatibility bounds in `pyproject.toml`, estab
     - locations from any transform order map to the correct original subject or context value and cover the characters they describe;
     - context-token and output-local PII round trips obey their distinct authority rules;
     - later edits either preserve an output-local marker exactly or permanently tombstone its restoration authority.
-- `check_backend_contract` runs against every built-in backend.
-- HTTP backends replay fixtures captured once from real servers, through `httpx.MockTransport`. LiteLLM uses `completion_fn`. Local Meta adapters use canned logits and completions. CI never downloads model weights.
+- `check_backend_contract` runs against `FakeBackend`.
+- CI never calls TypeSafe. `examples/live_typesafe.py` is manual and is not part of the suite.
 - Sync/async parity uses `jes.testing.assert_semantic_parity` with deterministic fakes and no wall-clock/transport race. It compares decision, completion, text projections, findings, scores, canonical usage slots, and value-equivalent redactions while excluding random result/store ids, HMAC tags, private manifests, timings, and permit ids. Under real deadlines or provider races, both APIs follow the same rules but are not promised identical external outcomes.
 - Isolation: concurrent calls on one guard with different stores, or with none, never see each other’s values; a prompt result paired with a different store fails before backend I/O; forged or altered sanitization stamps never take the fast path.
 - Authority lineage: invisible-character normalization cannot synthesize authority; every untracked token is neutralized after every edit; unauthorized output cannot gain authority through stamped history; stamp HMACs cover decision, completeness, findings, scope, and the occurrence manifest.
@@ -1471,22 +1313,22 @@ API-sensitive extras have tested compatibility bounds in `pyproject.toml`, estab
 - Deadlines: transport, retry, permit, cooperative CPU, and async wait expiry all exercise identical `DeadlineExceeded` behavior in raise/block/allow modes; resource-cap failures remain strict blocks.
 - No fixture contains hazardous content. Hazard and toxicity findings are exercised by returning high violation scores from the fake backend.
 - Coverage gate: 90% line and branch coverage on `jes/`.
-- CI runs lint, type checks, and tests on Python 3.11–3.14. Extras run on the Python versions their dependencies support. There is no workflow for live backend tests. Those runs are manual.
+- CI runs lint, type checks, and tests on Python 3.11–3.14. Extras run on the Python versions their dependencies support. There is no workflow for live TypeSafe tests. Those runs are manual.
 
 ## 14. Observability
 
 - Logging goes through the stdlib logger `jes`. Records include bounded policy id, action, score value/kind, request/decision profile ids, and latency. They never include checked text, context, history, redacted values, rendered requests, or provider bodies.
 - jes exception type/args, cause, context, notes, and library-owned metadata carry only allowlisted backend/status/policy/question identifiers, never text or provider bodies. A handler drops the original reference, exits `except`, then raises a fresh wrapper with no cause/context/notes or inherited internal traceback. Python caller traceback-frame locals are outside this guarantee; applications must not serialize arbitrary frame locals.
 - Every text-bearing type (`State`, `Message`, `Item`, transform outcomes/edits, results, and redaction stores) implements redacted `repr`; only findings, spans, counts, bounded static ids, and profile metadata are shown. Secret-bearing stores, sessions, authority manifests/snapshots, and output-local maps additionally reject pickle, JSON, copy, and deepcopy.
-- `Guard`, built-in backends, and policies with API/HMAC/encryption credentials use redacted representations and reject pickle/deepcopy; copying is either rejected or explicitly returns the same thread-safe credential owner without exposing material.
-- Supported LiteLLM versions must expose enforceable payload-log suppression; jes configures it per call and installs narrowly scoped redaction filters on adapter-owned logger handlers. A version that cannot suppress payloads is rejected by the `[litellm]` compatibility check. Application-added handlers and arbitrary custom-component logging remain outside jes’s guarantee and are called out in the README.
-- Tests capture records emitted by `jes` and its supported httpx/LiteLLM adapter configuration at DEBUG during success, retries, malformed bodies, built-in failures, and custom exception wrapping from every subject/context channel. Unique canary text and values must be absent from reprs, records, exception args/cause/context/notes, and library-owned metadata; tests explicitly exclude arbitrary caller traceback locals.
+- `Guard` and policies with HMAC or encryption credentials use redacted representations and reject pickle and deepcopy. The TypeSafe API key lives on `TypeSafeClassifier`, which stores it as a secret and omits it from `repr`.
+- Application-added log handlers are outside jes’s guarantee. jes does not filter the classifier’s own logs.
+- Tests capture records emitted by `jes` at DEBUG during success, malformed answers, built-in failures, and custom exception wrapping from every subject and context channel. Unique canary text and values must be absent from reprs, records, exception args, cause, context, notes, and library-owned metadata. Tests exclude arbitrary caller traceback locals.
 - `trace=True` fills `ScanResult.timings`. `ScanResult.usage` reports each physical request’s token usage in canonical logical/attempt order whenever the backend returns it.
 - No OpenTelemetry dependency in v1.
 
 ## 15. Versioning and releases
 
-- Semantic versioning. Public modules: `jes`, `jes.types`, `jes.questions`, `jes.backends`, `jes.policies`, `jes.recipes`, and `jes.testing`. `jes` re-exports the common result, message, threshold, redaction, and error types; `jes.questions` owns `Question`/`Answer` and their variants; `jes.policies` exports the public policy protocols, outcomes, `Item`, and factories. Everything else is private.
+- Semantic versioning. Public modules: `jes`, `jes.types`, `jes.questions`, `jes.judge`, `jes.policies`, `jes.recipes`, and `jes.testing`. `jes` re-exports the common result, message, threshold, redaction, and error types; `jes.questions` owns `Question`/`Answer` and their variants; `jes.policies` exports the public policy protocols, outcomes, `Item`, and factories. Everything else is private.
 - **Prompt versions.** A wording change adds a new version id. Before 1.0, a new default version can land in a minor release, with its evaluation numbers in the changelog. From 1.0, the old version stays selectable until the next major release; removing an id is a major change.
 - **Default thresholds.** A newly audit-qualified decision profile adds entries in a minor release. Changing its request profile, decision semantics, or threshold requires fresh acceptance data and a changelog note.
 - **Pinned profiles.** Examples pin provider, model revision or digest, adapter/scorer version, tokenizer, template, and mode where applicable. Findings record both request and decision fingerprints. Floating or caller-labeled-but-unverified profiles never receive defaults (section 7.4).
@@ -1498,7 +1340,7 @@ API-sensitive extras have tested compatibility bounds in `pyproject.toml`, estab
 | 0.1.0 | Milestones 0–4 | Changelog only. Not tagged. Engine, `Guard` and `AsyncGuard`, core transforms, secrets and PII, System One and LiteLLM, `judge()`. The first git tag is 0.2.0. |
 | 0.2.0 | Milestones 5–7 | Meta adapters, evaluation harness, and core judgment policies. Every call passes an explicit threshold. No published defaults and no recommended backend. |
 | 0.3.0 | Milestone 8 | Recipes for the rest of LLM Guard’s catalog |
-| 1.0.0 | Milestone 9 | Frozen public factories and v1 question ids, migration guide, README limitations. No published defaults. |
+| 1.0.0 | Milestone 9 | Frozen public factories and v1 question ids, README limitations. No published defaults. |
 
 ## 16. Milestones
 
@@ -1641,6 +1483,8 @@ Out of scope: Faker substitution, additional languages, and recognizers beyond t
 
 ### Milestone 4 — System One and LiteLLM backends (0.1.0)
 
+Those adapters shipped in the tree and were later removed. Section 8 is the current judge. The checklist below is the historical record, not the live API.
+
 Depends on: Milestone 1. It can run in parallel with Milestones 2 and 3; the tag waits for all three.
 
 Steps:
@@ -1668,6 +1512,8 @@ Status: 0.1.0 was not tagged. Jev fixtures were captured from the hosted API. La
 Out of scope: starting servers in CI, and live calls.
 
 ### Milestone 5 — Prompt Guard 2 and Llama Guard 4 adapters
+
+Those adapters shipped in the tree and were later removed. Injection and the S1–S14 hazard list are questions for the TypeSafe judge in section 8. The checklist below is the historical record, not the live API.
 
 Depends on: Milestone 4.
 
@@ -1731,7 +1577,7 @@ Steps:
 
 1. Promote the exact private candidate implementations, question ids/bytes/hashes, interpretation versions, and task routing evaluated in Milestone 6 into public factories without behavioral changes. Any change returns to Milestone 6 with fresh acceptance data.
 2. Leave `jes/policies/defaults.py` empty for this tag. A later audit may add block-only (`flag_at=None`) entries for qualified decision-profile fingerprints, with request-profile reference, threshold, run id, independent support, completion/error rates, and confidence metadata.
-3. Export factories with category and label subsets, `version=`, and `backend=` overrides. A subset uses a default only when that exact decision profile was evaluated.
+3. Export factories with category and label subsets, `version=`, and `model=` overrides. A subset uses a default only when that exact decision profile was evaluated.
 4. README: no results table and no recommended backend. Every shown threshold is an application choice.
 5. Tag 0.2.0.
 
@@ -1767,11 +1613,10 @@ Depends on: Milestone 8.
 
 Steps:
 
-1. `docs/migration.md`: each LLM Guard class and its jes equivalent, with notes that thresholds do not carry over and that PII recall differs unless `ner=` names a transformer model like LLM Guard’s default.
-2. `__all__` on public modules; pyright strict with no ignores outside the optional-import shims.
-3. README limitations: short context on local Laya, label-only scores without log-probabilities, explicit incomplete fail-open results, output judgments/restoration only on complete replies, plain-text-only restoration, no streamed/tool-argument restoration, no images, no multi-turn detection, no decoding of obfuscated payloads, and no safety guarantee.
-4. Freeze core and recipe question ids and every public factory signature. 1.0 does not rerun the evaluation and does not publish thresholds.
-5. Tag 1.0.0.
+1. `__all__` on public modules; pyright strict with no ignores outside the optional-import shims.
+2. README limitations: short context on local Laya, label-only scores without log-probabilities, explicit incomplete fail-open results, output judgments/restoration only on complete replies, plain-text-only restoration, no streamed/tool-argument restoration, no images, no multi-turn detection, no decoding of obfuscated payloads, and no safety guarantee.
+3. Freeze core and recipe question ids and every public factory signature. 1.0 does not rerun the evaluation and does not publish thresholds.
+4. Tag 1.0.0.
 
 Done when: a new user can follow the README and see an injection check plus an email redacted and restored, using documented imports. The example uses a clearly labeled application-chosen explicit threshold and makes no recommendation or default claim.
 

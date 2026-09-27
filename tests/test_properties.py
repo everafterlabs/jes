@@ -45,7 +45,7 @@ def test_chunks_cover_and_advance(text: str) -> None:
     state = State(stage="input", text="")
     try:
         chunks = chunk_text(
-            backend=backend,
+            model=backend,
             base_state=state,
             questions=questions,
             text=text,

@@ -16,7 +16,7 @@ from tests.helpers import CountingPolicy, FakeTransform, yesno_policy
 def test_duplicate_and_invalid_names() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
     with pytest.raises(PolicyError):
-        Guard([yesno_policy("same"), yesno_policy("same")], backend=backend)
+        Guard([yesno_policy("same"), yesno_policy("same")], model=backend)
     with pytest.raises(PolicyError):
         judge("1bad", YesNo("x"), threshold=0.8)
 
@@ -30,19 +30,19 @@ def test_empty_questions_and_missing_threshold() -> None:
         threshold=Threshold(0.8),
     )
     with pytest.raises(PolicyError):
-        Guard([empty], backend=backend)
+        Guard([empty], model=backend)
     missing = yesno_policy("need_default", threshold=None)
     with pytest.raises(PolicyError, match="no threshold"):
-        Guard([missing], backend=backend)
+        Guard([missing], model=backend)
 
 
 def test_unsupported_task_and_score_kind() -> None:
     backend = FakeBackend(tasks=frozenset({"injection"}))
     with pytest.raises(PolicyError):
-        Guard([yesno_policy()], backend=backend)
+        Guard([yesno_policy()], model=backend)
     kinds = FakeBackend(score_kinds={"other": frozenset({"probability"})})
     with pytest.raises(PolicyError, match="score kinds"):
-        Guard([yesno_policy()], backend=kinds)
+        Guard([yesno_policy()], model=kinds)
 
 
 def test_too_many_options_and_under_64_units() -> None:
@@ -56,15 +56,15 @@ def test_too_many_options_and_under_64_units() -> None:
         threshold=Threshold(0.8),
     )
     with pytest.raises(PolicyError):
-        Guard([policy], backend=backend)
+        Guard([policy], model=backend)
 
     tiny = FakeBackend(max_units=10)
     with pytest.raises(PolicyError, match="64"):
-        Guard([yesno_policy()], backend=tiny)
+        Guard([yesno_policy()], model=tiny)
 
 
 def test_invalid_max_attempts() -> None:
-    from jes.backends import BackendCapabilities
+    from jes.judge import BackendCapabilities
 
     with pytest.raises(PolicyError):
         BackendCapabilities(
@@ -93,20 +93,20 @@ def test_backend_cannot_split_one_policy() -> None:
         threshold=0.8,
     )
     with pytest.raises(PolicyError, match="split"):
-        Guard([policy], backend=backend)
+        Guard([policy], model=backend)
 
 
 def test_questions_called_once() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
     policy = yesno_policy()
-    Guard([policy], backend=backend)
+    Guard([policy], model=backend)
     assert policy.question_calls == 1
 
 
 def test_input_only_policy_skips_output() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.99, "probability")})
     policy = yesno_policy(stages=frozenset({"input"}))
-    guard = Guard([policy], backend=backend)
+    guard = Guard([policy], model=backend)
     incoming = guard.check_input("hello")
     assert incoming.decision == "block"
     outgoing = guard.check_output("hello", prompt="user prompt")
@@ -117,7 +117,7 @@ def test_input_only_policy_skips_output() -> None:
 def test_explicit_threshold_applies_to_every_stage() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.85, "probability")})
     policy = yesno_policy(threshold=0.8, stages=frozenset({"input", "output"}))
-    guard = Guard([policy], backend=backend)
+    guard = Guard([policy], model=backend)
     incoming = guard.check_input("x")
     outgoing = guard.check_output("x", prompt=incoming)
     assert incoming.decision == outgoing.decision == "block"
@@ -128,13 +128,13 @@ def test_missing_stage_default_fails_construction() -> None:
     backend = FakeBackend()
     policy = yesno_policy("needs", threshold=None, stages=frozenset({"input", "output"}))
     compiled_input = yesno_policy("needs", threshold=0.8, stages=frozenset({"input"}))
-    Guard([compiled_input], backend=backend)
-    compiled = Guard([compiled_input], backend=backend)._compiled.judgments[0]
+    Guard([compiled_input], model=backend)
+    compiled = Guard([compiled_input], model=backend)._compiled.judgments[0]
     fingerprint = compiled.decision_profiles["input"].fingerprint
     defaults._register(fingerprint, Threshold(0.8), "eval-test")
     try:
         with pytest.raises(PolicyError, match="output"):
-            Guard([policy], backend=backend)
+            Guard([policy], model=backend)
     finally:
         defaults._clear()
 
@@ -154,11 +154,11 @@ def test_subject_mode_is_static() -> None:
         threshold=0.8,
         items=lambda text: [Item(text, Span(0, len(text)))],
     )
-    Guard([items], backend=backend)
+    Guard([items], model=backend)
     assert items.subject_mode == "items"
 
 
 def test_dynamic_fingerprint_disables_nothing_at_construction() -> None:
     backend = FakeBackend(answers={"violation": YesNoAnswer(0.0, "probability")})
     transform = FakeTransform(name="dyn", labels=frozenset({"x"}), fingerprint=None)
-    Guard([transform, yesno_policy()], backend=backend)
+    Guard([transform, yesno_policy()], model=backend)

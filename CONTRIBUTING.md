@@ -24,8 +24,7 @@ uv run pytest
 ## Documentation
 
 The documentation site, [docs.getjes.dev](https://docs.getjes.dev), is built
-from a separate repository, `jes-docs`. Guides, the API reference, the
-migration guide, and the recipe catalog live there. It pulls these files from
+from a separate repository, `jes-docs`. Guides, the API reference, and the recipe catalog live there. It pulls these files from
 this repo at build time, so edit them here:
 
 - `examples/*.py`, which the cookbook embeds, and `docs/cookbook.md`

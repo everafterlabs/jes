@@ -104,7 +104,7 @@ def _guard(*, injection_score: float, indirect_score: float) -> Guard:
             injection(threshold=THRESHOLD),
             indirect_injection(threshold=THRESHOLD),
         ],
-        backend=FakeBackend(
+        model=FakeBackend(
             answers={
                 "injection.violation": YesNoAnswer(injection_score, "probability"),
                 "indirect_injection.violation": YesNoAnswer(indirect_score, "probability"),

@@ -11,7 +11,7 @@ from typing import cast
 from evals.runner import Example, Observation, phase_report, run_phase
 from evals.selection import assert_ids_allowed
 from evals.slices import PromptSlice, _mapping, load_bipia_train, load_xstest_prompts
-from jes.backends import SystemOne
+from jes.judge import Judge
 from jes.policies._candidates import (
     _Candidate,
     hazards_candidate,
@@ -48,22 +48,17 @@ def main() -> None:
         for example in (*sliver.labeled, *sliver.unlabeled)
     ]
     assert_ids_allowed("development", sent)
-    backend = SystemOne.hosted(timeout_s=45.0)
-    try:
-        reports = {
-            "injection": _score(
-                "injection", injection, injection_candidate(threshold=0.5), backend
-            ),
-            "hazards": _score("hazards", hazards, hazards_candidate(threshold=0.5), backend),
-            "indirect_injection": _score(
-                "indirect_injection",
-                PromptSlice([*table.labeled, *code.labeled], [], table.held_out + code.held_out),
-                indirect_injection_candidate(threshold=0.5),
-                backend,
-            ),
-        }
-    finally:
-        backend.close()
+    model = Judge("jev-latest")
+    reports = {
+        "injection": _score("injection", injection, injection_candidate(threshold=0.5), model),
+        "hazards": _score("hazards", hazards, hazards_candidate(threshold=0.5), model),
+        "indirect_injection": _score(
+            "indirect_injection",
+            PromptSlice([*table.labeled, *code.labeled], [], table.held_out + code.held_out),
+            indirect_injection_candidate(threshold=0.5),
+            model,
+        ),
+    }
     body = {
         "audit_opened": False,
         "default_threshold": None,
@@ -97,10 +92,10 @@ def _score(
     name: str,
     sliver: PromptSlice,
     policy: _Candidate,
-    backend: SystemOne,
+    model: Judge,
 ) -> dict[str, object]:
-    labeled = _resume(name, sliver.labeled, policy, backend)
-    unlabeled = _resume(f"{name}-unlabeled", sliver.unlabeled, policy, backend)
+    labeled = _resume(name, sliver.labeled, policy, model)
+    unlabeled = _resume(f"{name}-unlabeled", sliver.unlabeled, policy, model)
     report = phase_report(labeled, "development")
     report["held_out"] = sliver.held_out
     report["unlabeled"] = _cohort(unlabeled)
@@ -114,7 +109,7 @@ def _resume(
     name: str,
     examples: list[Example],
     policy: _Candidate,
-    backend: SystemOne,
+    model: Judge,
 ) -> list[Observation]:
     path = RESULTS / f"{name}.jsonl"
     done = _read_done(path)
@@ -126,7 +121,7 @@ def _resume(
             observations, _cache = run_phase(
                 chunk,
                 policy,
-                backend,
+                model,
                 "development",
                 workers=4,
                 deadline_s=60.0,

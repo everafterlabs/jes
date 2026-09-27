@@ -24,8 +24,8 @@ from evals.metrics import (
 from evals.pii_metrics import evaluate_pii
 from evals.topics import topic_report
 from jes import Guard
-from jes.backends import Backend, BackendResult, RequestContext
 from jes.errors import BackendError
+from jes.judge import Backend, BackendResult, RequestContext
 from jes.policies._candidates import _Candidate, injection_candidate
 from jes.policies._protocols import Policy
 from jes.policies.prompts import verify_prompt_bytes
@@ -144,7 +144,7 @@ def run_phase(
         cache = CachingBackend(backend, enabled=phase == "development")
     guard = Guard(
         [cast(Policy, policy)],
-        backend=cache,
+        model=cache,
         on_backend_error="block",
         deadline_s=30.0 if deadline_s is None else deadline_s,
     )

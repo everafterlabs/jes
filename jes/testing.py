@@ -17,7 +17,8 @@ from jes._engine.sensitive import (
     _SensitiveOutcome,
     register_sensitive,
 )
-from jes.backends import (
+from jes.errors import BackendError, DeadlineExceeded, PolicyError
+from jes.judge import (
     Backend,
     BackendCapabilities,
     BackendProfile,
@@ -26,7 +27,6 @@ from jes.backends import (
     RequestContext,
     RequestPermit,
 )
-from jes.errors import BackendError, DeadlineExceeded, PolicyError
 from jes.policies._protocols import (
     CallContext,
     Phase,
@@ -298,7 +298,7 @@ def check_backend_contract(backend: Backend) -> None:
             # A small contract request must fit every usable backend profile.
             raise PolicyError("backend leaves no room for a contract request")
 
-    from jes.backends import SyncBackend
+    from jes.judge import SyncBackend
 
     if not isinstance(backend, SyncBackend):
         return

@@ -7,7 +7,7 @@ import json
 import threading
 from collections.abc import Mapping
 
-from jes.backends import (
+from jes.judge import (
     AsyncBackend,
     Backend,
     BackendResult,

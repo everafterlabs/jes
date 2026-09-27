@@ -28,7 +28,7 @@ def test_two_emails_get_distinct_tokens_and_restore() -> None:
     store = Redactions(scope=b"conversation-1")
     guard = Guard(
         [invisible_text(), pii(restore_origins=["https://allowed.example"]), yesno_policy()],
-        backend=backend,
+        model=backend,
     )
     incoming = guard.check_input(f"mail {_EMAIL_A} and {_EMAIL_B}", redactions=store)
     assert incoming.ok
@@ -50,12 +50,12 @@ def test_two_emails_get_distinct_tokens_and_restore() -> None:
 def test_same_value_is_one_token_across_threads_and_turns() -> None:
     backend = _backend()
     store = Redactions(scope=b"shared")
-    guard = Guard([pii()], backend=backend)
+    guard = Guard([pii()], model=backend)
     incoming = guard.check_input(f"first {_EMAIL_A}", redactions=store)
     token = next(iter(incoming.redactions.snapshot_values()))
 
     def later() -> str:
-        again = Guard([pii()], backend=backend).check_input(
+        again = Guard([pii()], model=backend).check_input(
             f"again {_EMAIL_A}",
             redactions=store,
         )
@@ -74,10 +74,10 @@ def test_same_value_is_one_token_across_threads_and_turns() -> None:
 def test_forged_and_unauthorized_tokens_do_not_restore() -> None:
     backend = _backend()
     store = Redactions(scope=b"scope-a")
-    guard = Guard([pii()], backend=backend)
+    guard = Guard([pii()], model=backend)
     incoming = guard.check_input(f"mail {_EMAIL_A}", redactions=store)
     token = next(iter(incoming.redactions.snapshot_values()))
-    other = Guard([pii()], backend=backend).check_output(
+    other = Guard([pii()], model=backend).check_output(
         token,
         prompt="raw prompt",
         redactions=Redactions(scope=b"scope-b"),
@@ -91,7 +91,7 @@ def test_forged_and_unauthorized_tokens_do_not_restore() -> None:
 def test_live_token_in_user_text_is_neutralized() -> None:
     backend = _backend()
     store = Redactions(scope=b"scope")
-    guard = Guard([pii(), yesno_policy()], backend=backend)
+    guard = Guard([pii(), yesno_policy()], model=backend)
     incoming = guard.check_input(f"mail {_EMAIL_A}", redactions=store)
     token = next(iter(incoming.redactions.snapshot_values()))
     leaked = guard.check_input(f"copied {token}", redactions=store)
@@ -103,7 +103,7 @@ def test_live_token_in_user_text_is_neutralized() -> None:
 
 def test_evasion_emails_are_redacted() -> None:
     backend = _backend()
-    guard = Guard([invisible_text(), pii()], backend=backend)
+    guard = Guard([invisible_text(), pii()], model=backend)
     cases = [
         "alice\u200b@example.com",
         "a\u200dlice@example.com",
@@ -118,7 +118,7 @@ def test_evasion_emails_are_redacted() -> None:
 
 def test_restore_false_uses_irreversible_markers() -> None:
     backend = _backend()
-    guard = Guard([pii(restore=False)], backend=backend)
+    guard = Guard([pii(restore=False)], model=backend)
     incoming = guard.check_input(f"mail {_EMAIL_A}")
     assert incoming.ok
     assert len(incoming.redactions) == 0
@@ -131,10 +131,10 @@ def test_canary_blocks_and_removes() -> None:
     backend = _backend()
     guard = Guard(
         [canary("CANARY-TOKEN"), yesno_policy()],
-        backend=backend,
+        model=backend,
         fail_fast=False,
     )
-    incoming = Guard([yesno_policy()], backend=backend).check_input("prompt")
+    incoming = Guard([yesno_policy()], model=backend).check_input("prompt")
     outgoing = guard.check_output("leaked CANARY-TOKEN here", prompt=incoming)
     assert outgoing.decision == "block"
     assert "CANARY-TOKEN" not in outgoing.sanitized
@@ -144,7 +144,7 @@ def test_canary_blocks_and_removes() -> None:
 def test_secret_is_redacted_twice_in_memory() -> None:
     _reset_secrets_config()
     backend = _backend()
-    guard = Guard([secrets()], backend=backend)
+    guard = Guard([secrets()], model=backend)
     result = guard.check_input(f"one {_FAKE_KEY} two {_FAKE_KEY}")
     assert _FAKE_KEY not in result.sanitized
     assert result.sanitized.count("******") == 2
@@ -155,7 +155,7 @@ def test_uri_policy_and_restore_origins() -> None:
     store = Redactions(scope=b"uri")
     guard = Guard(
         [pii(restore_origins=["https://allowed.example"]), yesno_policy()],
-        backend=backend,
+        model=backend,
     )
     incoming = guard.check_input(f"mail {_EMAIL_A}", redactions=store)
     token = next(iter(incoming.redactions.snapshot_values()))
@@ -183,7 +183,7 @@ def test_uri_policy_and_restore_origins() -> None:
 def test_dumps_loads_and_copy_refusal() -> None:
     store = Redactions(scope=b"dump-scope")
     backend = _backend()
-    Guard([pii()], backend=backend).check_input(f"mail {_EMAIL_A}", redactions=store)
+    Guard([pii()], model=backend).check_input(f"mail {_EMAIL_A}", redactions=store)
     key = b"k" * 32
     blob = store.dumps(key, associated_data=b"aad")
     loaded = Redactions.loads(blob, key, scope=b"dump-scope", associated_data=b"aad")
@@ -203,7 +203,7 @@ def test_dumps_loads_and_copy_refusal() -> None:
 def test_redaction_overflow_is_atomic() -> None:
     backend = _backend()
     store = Redactions(scope=b"tiny", max_entries=1)
-    guard = Guard([pii()], backend=backend)
+    guard = Guard([pii()], model=backend)
     first = guard.check_input(f"mail {_EMAIL_A}", redactions=store)
     assert first.ok
     second = guard.check_input(f"mail {_EMAIL_B}", redactions=store)
@@ -232,28 +232,28 @@ def test_language_and_factory_validation() -> None:
 
 def test_pii_mask_block_and_output_modes() -> None:
     backend = _backend()
-    masked = Guard([pii(input_mode="mask")], backend=backend).check_input(f"mail {_EMAIL_A}")
+    masked = Guard([pii(input_mode="mask")], model=backend).check_input(f"mail {_EMAIL_A}")
     assert _EMAIL_A not in masked.sanitized
-    blocked = Guard([pii(input_mode="block")], backend=backend).check_input(f"mail {_EMAIL_A}")
+    blocked = Guard([pii(input_mode="block")], model=backend).check_input(f"mail {_EMAIL_A}")
     assert blocked.decision == "block"
-    incoming = Guard([yesno_policy()], backend=backend).check_input("p")
-    flagged = Guard([pii(output_mode="flag")], backend=backend).check_output(
+    incoming = Guard([yesno_policy()], model=backend).check_input("p")
+    flagged = Guard([pii(output_mode="flag")], model=backend).check_output(
         f"see {_EMAIL_A}",
         prompt=incoming,
     )
     assert _EMAIL_A not in flagged.sanitized
     assert _EMAIL_A in flagged.text
-    redacted = Guard([pii(output_mode="redact")], backend=backend).check_output(
+    redacted = Guard([pii(output_mode="redact")], model=backend).check_output(
         f"see {_EMAIL_A}",
         prompt=incoming,
     )
     assert "[REDACTED_EMAIL_ADDRESS]" in redacted.text
-    denied = Guard([pii(output_mode="block")], backend=backend).check_output(
+    denied = Guard([pii(output_mode="block")], model=backend).check_output(
         f"see {_EMAIL_A}",
         prompt=incoming,
     )
     assert denied.decision == "block"
-    untrusted = Guard([pii()], backend=backend).check_untrusted(f"doc {_EMAIL_A}")
+    untrusted = Guard([pii()], model=backend).check_untrusted(f"doc {_EMAIL_A}")
     assert _EMAIL_A not in untrusted.sanitized
 
 
@@ -261,11 +261,11 @@ def test_secrets_partial_hmac_and_uri_rejects() -> None:
     _reset_secrets_config()
     backend = _backend()
     key = b"k" * 32
-    partial = Guard([secrets(redact="partial")], backend=backend).check_input(f"tok {_FAKE_KEY}")
+    partial = Guard([secrets(redact="partial")], model=backend).check_input(f"tok {_FAKE_KEY}")
     assert _FAKE_KEY not in partial.sanitized
     assert partial.sanitized.startswith("tok ")
     _reset_secrets_config()
-    hashed = Guard([secrets(redact="hmac", key=key)], backend=backend).check_input(
+    hashed = Guard([secrets(redact="hmac", key=key)], model=backend).check_input(
         f"tok {_FAKE_KEY}"
     )
     assert _FAKE_KEY not in hashed.sanitized
@@ -324,18 +324,18 @@ def test_uri_ipv_restore_caps_and_secret_lock() -> None:
     _reset_secrets_config()
     backend = _backend()
     store = Redactions(scope=b"cap")
-    incoming = Guard([pii(), yesno_policy()], backend=backend).check_input(
+    incoming = Guard([pii(), yesno_policy()], model=backend).check_input(
         f"mail {_EMAIL_A}",
         redactions=store,
     )
     token = next(iter(incoming.redactions.snapshot_values()))
     capped = Guard(
         [pii(), yesno_policy()],
-        backend=backend,
+        model=backend,
         max_restored_output_bytes=1,
     ).check_output(token, prompt=incoming, redactions=store)
     assert capped.decision == "block"
     assert any(finding.label == "restored_output_too_large" for finding in capped.findings)
     assert _EMAIL_A not in capped.text
-    card = Guard([pii()], backend=backend).check_input("card 4111111111111112")
+    card = Guard([pii()], model=backend).check_input("card 4111111111111112")
     assert "4111111111111112" in card.sanitized

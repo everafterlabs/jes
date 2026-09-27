@@ -226,7 +226,7 @@ def test_factories_validate_and_guard_round_trip() -> None:
             token_limit(64),
             yesno_policy(),
         ],
-        backend=backend,
+        model=backend,
     )
     allowed = guard.check_input("hello")
     assert allowed.ok

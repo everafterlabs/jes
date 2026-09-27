@@ -8,7 +8,6 @@ from pathlib import Path
 from pytest import MonkeyPatch
 
 from jes._env import apply_env_file, load_project_env
-from jes.backends import SystemOne
 
 
 def _jes_root(path: Path) -> Path:
@@ -72,23 +71,3 @@ def test_load_project_env_ignores_other_projects_and_missing_file(
     load_project_env(root)
     assert os.environ.get("TYPESAFE_API_KEY") is None
 
-
-def test_hosted_prefers_existing_env_then_file_then_argument(
-    tmp_path: Path, monkeypatch: MonkeyPatch
-) -> None:
-    root = _jes_root(tmp_path / "repo")
-    (root / ".env").write_text("TYPESAFE_API_KEY=from-file\n", encoding="utf-8")
-    monkeypatch.chdir(root)
-    monkeypatch.setenv("TYPESAFE_API_KEY", "from-env")
-    from_env = SystemOne.hosted()
-    assert from_env._api_key == "from-env"
-    from_env.close()
-
-    monkeypatch.delenv("TYPESAFE_API_KEY")
-    from_file = SystemOne.hosted()
-    assert from_file._api_key == "from-file"
-    from_file.close()
-
-    explicit = SystemOne.hosted(api_key="explicit")
-    assert explicit._api_key == "explicit"
-    explicit.close()

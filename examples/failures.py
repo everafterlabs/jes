@@ -12,7 +12,7 @@ def main() -> tuple[str, InputResult, InputResult, InputResult]:
     try:
         Guard(
             [injection(threshold=0.50)],
-            backend=empty,
+            model=empty,
             on_backend_error="raise",
         ).check_input("hello")
         raised = "no-error"
@@ -20,17 +20,17 @@ def main() -> tuple[str, InputResult, InputResult, InputResult]:
         raised = "raised"
     blocked = Guard(
         [injection(threshold=0.50)],
-        backend=FakeBackend(),
+        model=FakeBackend(),
         on_backend_error="block",
     ).check_input("hello")
     opened = Guard(
         [injection(threshold=0.50)],
-        backend=FakeBackend(),
+        model=FakeBackend(),
         on_backend_error="allow",
     ).check_input("hello")
     limited = Guard(
         [injection(threshold=0.50)],
-        backend=FakeBackend(answers={}),
+        model=FakeBackend(answers={}),
         max_input_bytes=4,
     ).check_input("too long for the cap")
     # opened.decision is allow, but opened.onward is the refusal.
