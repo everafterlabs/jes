@@ -6,8 +6,13 @@ The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
-- Align `docs/design.md` with the tagged releases: no published defaults,
-  no recommended backend, and the audit left unopened.
+## 1.0.1
+
+- Judge with TypeSafe through LangChain. The earlier model backends are removed.
+- Add tool-call and tool-result checks.
+- Add the cookbook and an offline README quickstart.
+- Move the package to `src/jes` and ship only that tree in the source distribution.
+- Point the docs at docs.getjes.dev.
 
 ## 1.0.0
 

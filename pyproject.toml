@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "jes"
-version = "1.0.0"
+version = "1.0.1"
 description = "A policy engine for checking text around language models"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
-authors = [{ name = "jes contributors" }]
+authors = [{ name = "MonkeyBuddy" }]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "License :: OSI Approved :: Apache Software License",
