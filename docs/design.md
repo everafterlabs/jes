@@ -717,7 +717,7 @@ class Threshold:
 
 **Request and decision profiles.** Construction first computes a `RequestProfile` for every state-independent question partition. It fingerprints ordered subject/context transforms; engine and HTTP-serialization versions; exact behavior-affecting dependency/model/data assets; renderer/planner versions; backend capabilities/profile/attestation; stage/context/source/subject modes; exact partition; chunk rules; total-window budget; template/tokenizer; and generation settings. It describes what is sent, not a policy threshold.
 
-For each policy in that request, construction computes a `DecisionProfile`. It adds policy kind/version/subset, stage, question and answer-kind schema, interpretation version, and merge version to the request-profile hash. `jes/policies/defaults.py` maps each decision-profile fingerprint—not a shared request fingerprint—to one threshold and evaluation run id. The table is empty in 1.0. A bundled request therefore resolves a threshold vector keyed by policy name.
+For each policy in that request, construction computes a `DecisionProfile`. It adds policy kind/version/subset, stage, question and answer-kind schema, interpretation version, and merge version to the request-profile hash. `src/jes/policies/defaults.py` maps each decision-profile fingerprint—not a shared request fingerprint—to one threshold and evaluation run id. The table is empty in 1.0. A bundled request therefore resolves a threshold vector keyed by policy name.
 
 Any decision-profile mismatch requires an explicit threshold. That includes a different TypeSafe model id, policy subset, transform set, question partition, chunk rules, or interpretation/merge version. Recipes and `judge()` always require explicit thresholds. A published default is pinned to a versioned id such as `jev-1.13.0`. The alias `jev-latest` never matches.
 
@@ -1074,7 +1074,7 @@ Before I/O, the planner reserves deterministic attempt slots for each finalized 
 
 - Every built-in yes/no question is phrased so true means violation. `relevance`, for example, asks whether the output fails to address the prompt.
 - Instructions refer to state fields by name: “the text”, “the prompt”, “the question”, “the sources”.
-- Instruction text lives in `jes/policies/prompts.py` under ids such as `injection.v1`. A snapshot test fails on any edit; a wording change is a new version.
+- Instruction text lives in `src/jes/policies/prompts.py` under ids such as `injection.v1`. A snapshot test fails on any edit; a wording change is a new version.
 - Callers pick a version with `version=`. Findings record it.
 
 ### 10.2 Core transforms
@@ -1242,7 +1242,7 @@ When a release does publish a default, that evaluation recommends a pinned TypeS
 ## 12. Package layout and dependencies
 
 ```text
-jes/
+src/jes/
   __init__.py            # Guard, AsyncGuard, Redactions, results, Threshold, errors
   _env.py                # optional project .env for unset API keys
   errors.py
@@ -1287,7 +1287,7 @@ The core depends on `langchain-typesafe`. Policy extras are imported inside the 
 | `tokens` | tiktoken | `token_limit` |
 | `json` | json-repair | `recipes.json_check(repair=True)` |
 
-Tooling: uv for environments and the lockfile, hatchling, ruff, pyright in strict mode on `jes/` and `evals/`, pytest with hypothesis.
+Tooling: uv for environments and the lockfile, hatchling, ruff, pyright in strict mode on `src/jes/` and `evals/`, pytest with hypothesis.
 
 The uv lock records exact CI versions. A published default records the TypeSafe model id and the `langchain-typesafe` version in the request profile. A different model id cannot reuse that default.
 
@@ -1312,7 +1312,7 @@ The uv lock records exact CI versions. A published default records the TypeSafe 
 - Planning: subject mode never changes at runtime, one policy is never split across question partitions, and public usage ordering is invariant under concurrent completion/retry order.
 - Deadlines: transport, retry, permit, cooperative CPU, and async wait expiry all exercise identical `DeadlineExceeded` behavior in raise/block/allow modes; resource-cap failures remain strict blocks.
 - No fixture contains hazardous content. Hazard and toxicity findings are exercised by returning high violation scores from the fake backend.
-- Coverage gate: 90% line and branch coverage on `jes/`.
+- Coverage gate: 90% line and branch coverage on `src/jes/`.
 - CI runs lint, type checks, and tests on Python 3.11–3.14. Extras run on the Python versions their dependencies support. There is no workflow for live TypeSafe tests. Those runs are manual.
 
 ## 14. Observability
@@ -1576,7 +1576,7 @@ Depends on: Milestones 3 and 6. Tagged as 0.2.0 with the public factories and an
 Steps:
 
 1. Promote the exact private candidate implementations, question ids/bytes/hashes, interpretation versions, and task routing evaluated in Milestone 6 into public factories without behavioral changes. Any change returns to Milestone 6 with fresh acceptance data.
-2. Leave `jes/policies/defaults.py` empty for this tag. A later audit may add block-only (`flag_at=None`) entries for qualified decision-profile fingerprints, with request-profile reference, threshold, run id, independent support, completion/error rates, and confidence metadata.
+2. Leave `src/jes/policies/defaults.py` empty for this tag. A later audit may add block-only (`flag_at=None`) entries for qualified decision-profile fingerprints, with request-profile reference, threshold, run id, independent support, completion/error rates, and confidence metadata.
 3. Export factories with category and label subsets, `version=`, and `model=` overrides. A subset uses a default only when that exact decision profile was evaluated.
 4. README: no results table and no recommended backend. Every shown threshold is an application choice.
 5. Tag 0.2.0.

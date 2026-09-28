@@ -11,7 +11,7 @@ import sys
 import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-OUT = ROOT / "jes" / "policies"
+OUT = ROOT / "src" / "jes" / "policies"
 NOTICE = """\
 # Unicode Data Files are under the Unicode License, version 3.0.
 # Copyright © Unicode, Inc. All rights reserved.

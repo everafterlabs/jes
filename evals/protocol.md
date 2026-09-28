@@ -22,7 +22,7 @@ and cannot become defaults.
 
 Stages, in order: development, selection, calibration, sealed audit, and later
 rolling holdouts. Development may tune nothing that is already frozen: the
-candidate bytes in `jes/policies/prompts.py` are already hashed. Selection
+candidate bytes in `src/jes/policies/prompts.py` are already hashed. Selection
 ranks and freezes at most two finalists. Calibration picks a threshold.
 Sealed audit accepts or rejects that frozen set. A failed finalist is not
 replaced from the same audit. A new candidate needs a fresh holdout.

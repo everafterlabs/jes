@@ -37,6 +37,7 @@ secrets = ["detect-secrets>=1.5"]
 tokens = ["tiktoken>=0.8,<1"]
 
 [project.urls]
+Homepage = "https://getjes.dev"
 Documentation = "https://docs.getjes.dev"
 Repository = "https://github.com/henbenmoshe/jes"
 Issues = "https://github.com/henbenmoshe/jes/issues"
@@ -58,8 +59,16 @@ dev = [
   "tiktoken>=0.8,<1",
 ]
 
+[tool.hatch.build.targets.sdist]
+only-include = [
+  "/src/jes",
+  "/README.md",
+  "/LICENSE",
+  "/pyproject.toml",
+]
+
 [tool.hatch.build.targets.wheel]
-packages = ["jes"]
+packages = ["src/jes"]
 
 [tool.ruff]
 target-version = "py311"
@@ -70,11 +79,11 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]
-"jes/policies/_ucd_data.py" = ["E501", "RUF001", "RUF002", "RUF003"]
-"jes/policies/_confusables_data.py" = ["E501", "RUF001", "RUF002", "RUF003"]
+"src/jes/policies/_ucd_data.py" = ["E501", "RUF001", "RUF002", "RUF003"]
+"src/jes/policies/_confusables_data.py" = ["E501", "RUF001", "RUF002", "RUF003"]
 
 [tool.pyright]
-include = ["jes", "evals"]
+include = ["src/jes", "evals"]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
 reportMissingTypeStubs = "none"
@@ -84,6 +93,7 @@ reportPrivateUsage = "none"
 addopts = "--strict-config --strict-markers --cov=jes --cov-report=term-missing --cov-branch"
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["src", "."]
 
 [tool.coverage.run]
 branch = true
