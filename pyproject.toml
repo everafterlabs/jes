@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "jes"
 version = "1.0.1"
-description = "A policy engine for checking text around language models"
+description = "A security toolkit for AI agents"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
