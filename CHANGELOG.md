@@ -6,6 +6,10 @@ The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+## 1.0.2
+
+- Describe the package as "jes is a security toolkit for AI agents."
+
 ## 1.0.1
 
 - Judge with TypeSafe through LangChain. The earlier model backends are removed.
