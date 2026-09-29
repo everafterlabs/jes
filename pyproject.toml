@@ -34,7 +34,7 @@ pii-ner = [
 json = ["json-repair>=0.30"]
 regex = ["regex>=2024.11.6"]
 secrets = ["detect-secrets>=1.5"]
-tokens = ["tiktoken>=0.8,<1"]
+tokens = ["tiktoken>=0.14.0,<1"]
 
 [project.urls]
 Homepage = "https://getjes.dev"
@@ -56,7 +56,7 @@ dev = [
   "pytest-cov>=6",
   "regex>=2024.11.6",
   "ruff>=0.11",
-  "tiktoken>=0.8,<1",
+  "tiktoken>=0.14.0,<1",
 ]
 
 [tool.hatch.build.targets.sdist]
