@@ -39,8 +39,8 @@ tokens = ["tiktoken>=0.8,<1"]
 [project.urls]
 Homepage = "https://getjes.dev"
 Documentation = "https://docs.getjes.dev"
-Repository = "https://github.com/henbenmoshe/jes"
-Issues = "https://github.com/henbenmoshe/jes/issues"
+Repository = "https://github.com/everafterlabs/jes"
+Issues = "https://github.com/everafterlabs/jes/issues"
 
 [dependency-groups]
 dev = [
