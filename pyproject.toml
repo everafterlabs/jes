@@ -77,6 +77,9 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
+[tool.ruff.lint.isort]
+combine-as-imports = true
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]
 "src/jes/policies/_ucd_data.py" = ["E501", "RUF001", "RUF002", "RUF003"]

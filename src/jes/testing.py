@@ -34,8 +34,7 @@ from jes.policies._protocols import (
     TransformOutcome,
     TransformPolicy,
 )
-from jes.policies.defaults import _clear as clear_defaults
-from jes.policies.defaults import _register as register_default
+from jes.policies.defaults import _clear as clear_defaults, _register as register_default
 from jes.questions import Answer, Question, ScoreKind, YesNo, YesNoAnswer
 from jes.redactions import RedactionTransaction
 from jes.types import Action, InputResult, ScanResult, Span, Stage, State, Usage
