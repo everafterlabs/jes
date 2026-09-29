@@ -9,6 +9,7 @@ The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## 1.0.3
 
 - Point the project URLs at everafterlabs/jes.
+- Raise the minimum versions of cryptography, json-repair, tiktoken, and hypothesis.
 
 ## 1.0.2
 
