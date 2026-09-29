@@ -1,0 +1,53 @@
+{
+  "limits": [
+    "PostToolUse fires after the tool has already run. A blocked result keeps the model from reading it. It does not undo a shell command or a file write. That is what PreToolUse is for.",
+    "MessageDisplay changes the text on screen only. The transcript, and what Claude sees on the next turn, keep the original reply. Exit code 2 does not block this event.",
+    "A PostToolUse or MessageDisplay process that dies before printing JSON fails open. The CLI still catches judge errors and prints a refusal so a Jev failure is not a silent allow."
+  ],
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jes claude-hook",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jes claude-hook",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jes claude-hook",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "MessageDisplay": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jes claude-hook",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
