@@ -26,6 +26,7 @@ from jes.policies import (
     secrets,
     substrings,
     token_limit,
+    tool_safety,
     topics,
     toxicity,
 )
@@ -41,6 +42,11 @@ _PiiOutput = Literal["flag", "redact", "block"]
 
 
 class InjectionGuard(TypedDict):
+    enabled: bool
+    threshold: NotRequired[float]
+
+
+class ToolSafetyGuard(TypedDict):
     enabled: bool
     threshold: NotRequired[float]
 
@@ -132,6 +138,7 @@ class Guards(TypedDict, total=False):
     topics: TopicsGuard
     invisible_text: InvisibleTextGuard
     allowed_tools: AllowedToolsGuard
+    tool_safety: ToolSafetyGuard
     canary: CanaryGuard
     regex: RegexGuard
     substrings: SubstringsGuard
@@ -229,6 +236,8 @@ def parse_config(value: object) -> GuardConfig:
         parsed["invisible_text"] = _parse_invisible(guards["invisible_text"])
     if "allowed_tools" in guards:
         parsed["allowed_tools"] = _parse_allowed_tools(guards["allowed_tools"])
+    if "tool_safety" in guards:
+        parsed["tool_safety"] = _parse_tool_safety(guards["tool_safety"])
     if "canary" in guards:
         parsed["canary"] = _parse_canary(guards["canary"])
     if "regex" in guards:
@@ -298,6 +307,9 @@ def _policies(config: GuardConfig) -> Sequence[Policy]:
             if not names:
                 raise ConfigError("allowed_tools requires names")
             chosen.append(allowed_tools(names))
+        safety = guards.get("tool_safety")
+        if safety is not None and safety["enabled"]:
+            chosen.append(tool_safety(threshold=_need_threshold("tool_safety", safety)))
         canary_guard = guards.get("canary")
         if canary_guard is not None and canary_guard["enabled"]:
             token = canary_guard.get("token", "")
@@ -329,6 +341,14 @@ def _parse_injection(value: object) -> InjectionGuard:
     parsed: InjectionGuard = {"enabled": _enabled("injection", body)}
     if "threshold" in body:
         parsed["threshold"] = _threshold("injection", body["threshold"])
+    return parsed
+
+
+def _parse_tool_safety(value: object) -> ToolSafetyGuard:
+    body = _guard_object("tool_safety", value, ToolSafetyGuard)
+    parsed: ToolSafetyGuard = {"enabled": _enabled("tool_safety", body)}
+    if "threshold" in body:
+        parsed["threshold"] = _threshold("tool_safety", body["threshold"])
     return parsed
 
 
@@ -577,7 +597,12 @@ def _secrets_policy(guard: SecretsGuard) -> object:
 
 def _need_threshold(
     name: str,
-    guard: InjectionGuard | IndirectInjectionGuard | HazardsGuard | ToxicityGuard | TopicsGuard,
+    guard: InjectionGuard
+    | IndirectInjectionGuard
+    | HazardsGuard
+    | ToxicityGuard
+    | TopicsGuard
+    | ToolSafetyGuard,
 ) -> float:
     if "threshold" not in guard:
         raise ConfigError(f"{name} requires threshold")

@@ -30,6 +30,10 @@
       "enabled": false,
       "names": []
     },
+    "tool_safety": {
+      "enabled": false,
+      "threshold": 0.5
+    },
     "canary": {
       "enabled": false,
       "token": ""

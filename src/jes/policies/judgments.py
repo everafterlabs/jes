@@ -15,6 +15,7 @@ from jes.policies._candidates import (
     hazards_candidate,
     indirect_injection_candidate,
     injection_candidate,
+    tool_safety_candidate,
     topics_candidate,
     toxicity_candidate,
 )
@@ -337,6 +338,18 @@ def hazards(
     return _publish(hazards_candidate(categories), threshold=threshold, model=model)
 
 
+def tool_safety(
+    *,
+    threshold: float | Threshold,
+    version: str = "v1",
+    model: ModelSpec | None = None,
+) -> _Candidate:
+    """Frozen tool_safety.v1 question. The threshold is required until it is measured."""
+
+    _checked_version(version, "tool_safety.v1")
+    return _publish(tool_safety_candidate(), threshold=threshold, model=model)
+
+
 def topics(
     deny: Iterable[str],
     *,
@@ -368,6 +381,7 @@ __all__ = [
     "indirect_injection",
     "injection",
     "judge",
+    "tool_safety",
     "topics",
     "toxicity",
 ]

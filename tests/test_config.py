@@ -51,6 +51,22 @@ def test_default_enables_the_three_guards() -> None:
     ]
 
 
+def test_tool_safety_stays_off_until_enabled() -> None:
+    document = default_document()
+    assert "tool_safety" not in [item.name for item in policies_from_config(document)]
+    guards = _guards(document)
+    guards["tool_safety"]["enabled"] = True
+    guards["tool_safety"]["threshold"] = 0.4
+    policy = next(item for item in policies_from_config(document) if item.name == "tool_safety")
+    assert policy.threshold is not None
+    assert policy.threshold.block_at == 0.4
+
+    document = default_document()
+    _guards(document)["tool_safety"] = {"enabled": True}
+    with pytest.raises(ConfigError, match="threshold"):
+        policies_from_config(document)
+
+
 def test_disabled_guard_is_omitted() -> None:
     document = default_document()
     _guards(document)["injection"]["enabled"] = False

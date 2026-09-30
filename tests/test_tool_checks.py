@@ -13,6 +13,7 @@ from jes.policies import (
     pii,
     secrets,
     substrings,
+    tool_safety,
 )
 from jes.questions import YesNoAnswer
 from jes.testing import FakeBackend
@@ -97,6 +98,30 @@ def test_injection_runs_on_tool_calls_not_tool_results() -> None:
     assert result.decision == "allow"
     assert "indirect_injection.violation" in result.scores
     assert "injection.violation" not in result.scores
+
+
+def test_tool_safety_blocks_only_unsafe_tool_calls() -> None:
+    blocked = Guard(
+        [tool_safety(threshold=0.5)],
+        model=FakeBackend(answers={"violation": YesNoAnswer(0.9, "probability")}),
+    ).check_tool_call("shell", {"command": "rm -rf /"}, prompt="Summarize this file.")
+    assert blocked.decision == "block"
+    assert blocked.onward == "Tool call blocked."
+    assert "tool_safety.violation" in blocked.scores
+
+    allowed = Guard(
+        [tool_safety(threshold=0.5)],
+        model=FakeBackend(answers={"violation": YesNoAnswer(0.1, "probability")}),
+    ).check_tool_call("shell", {"command": "ls"}, prompt="List the files.")
+    assert allowed.decision == "allow"
+    assert "tool_safety.violation" in allowed.scores
+
+    result = Guard(
+        [tool_safety(threshold=0.5)],
+        model=FakeBackend(answers={"violation": YesNoAnswer(0.9, "probability")}),
+    ).check_tool_result("rm -rf /", name="shell", prompt="Summarize this file.")
+    assert result.decision == "allow"
+    assert "tool_safety.violation" not in result.scores
 
 
 def test_disallowed_tool_name_blocks_without_editing_arguments() -> None:

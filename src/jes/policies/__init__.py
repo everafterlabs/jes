@@ -22,6 +22,7 @@ from jes.policies.judgments import (
     indirect_injection,
     injection,
     judge,
+    tool_safety,
     topics,
     toxicity,
 )
@@ -66,6 +67,7 @@ __all__ = [
     "secrets",
     "substrings",
     "token_limit",
+    "tool_safety",
     "topics",
     "toxicity",
 ]

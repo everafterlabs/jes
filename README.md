@@ -78,6 +78,7 @@ Pass any of these to `Guard`. Judgment guards take `threshold=`.
 * `invisible_text` — hidden and lookalike characters
 * `regex`, `substrings`, `token_limit`
 * `allowed_tools` — tool names you permit
+* `tool_safety` — whether a tool call and its arguments are safe for the user's request. The threshold is required; `0.5` in the agent config is a starting value, not a measured recommendation
 * `canary` — a marker that must not appear in the reply
 * `judge` — a question you write
 
