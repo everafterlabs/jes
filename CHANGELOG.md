@@ -6,6 +6,12 @@ The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+## 1.0.4
+
+- Add the `jes` command. Agent hooks run with `uvx jes`.
+- Add Claude Code, Codex, and Hermes hook commands, plus OpenCode, OpenClaw, and Pi plugins.
+- `jes login` saves the TypeSafe API key. Hooks read `~/.config/jes/config.json` for which guards run and their settings.
+
 ## 1.0.3
 
 - Point the project URLs at everafterlabs/jes.

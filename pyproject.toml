@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "jes"
-version = "1.0.3"
+version = "1.0.4"
 description = "jes is a security toolkit for AI agents"
 readme = "README.md"
 requires-python = ">=3.11"
