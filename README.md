@@ -102,14 +102,17 @@ if question.ok:
     print(answer.onward)
 ```
 
-For a full LangChain agent with middleware, see [`examples/langchain_agent.py`](examples/langchain_agent.py).
-
 </details>
 
 <details>
 <summary><b>Guard an agent's tool calls</b></summary>
 
+Check every tool call before it runs, and what it returns. With LangChain `create_agent` middleware:
+
 ```python
+from langchain.agents import create_agent
+from langchain.agents.middleware import wrap_tool_call
+from langchain.messages import ToolMessage
 from jes.policies import allowed_tools, indirect_injection, tool_safety
 
 guard = Guard(
@@ -117,11 +120,20 @@ guard = Guard(
     model="jev-latest",
 )
 
-call = guard.check_tool_call("search", {"q": "quarterly notes"}, prompt=result)
-if call.ok:
-    result = guard.check_tool_result(run_search("quarterly notes"), name="search", prompt=result)
-    feed_to_model(result.onward)      # a poisoned page becomes a refusal
+@wrap_tool_call
+def guard_tools(request, handler):
+    call, prompt = request.tool_call, request.state["messages"][0].content
+    checked = guard.check_tool_call(call["name"], call["args"], prompt=prompt)
+    if checked.ok:  # the tool is allowed and fits the request
+        output = handler(request).content
+        checked = guard.check_tool_result(output, name=call["name"], prompt=prompt)
+    return ToolMessage(checked.onward, tool_call_id=call["id"])  # a blocked call or poisoned page becomes a refusal
+
+agent = create_agent("anthropic:claude-sonnet-5-5", tools=[search], middleware=[guard_tools])
+agent.invoke({"messages": [{"role": "user", "content": "Summarize the quarterly notes."}]})
 ```
+
+To also check the input and the reply in the same middleware, see [`examples/langchain_agent.py`](examples/langchain_agent.py).
 
 </details>
 
