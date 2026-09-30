@@ -70,6 +70,16 @@ print(result.onward)  # "Blocked: injection."
 
 `result.ok` says whether to continue. `result.onward` is the text to pass on: the original text, a redacted version, or a block message.
 
+| Method | When |
+| --- | --- |
+| `check_input(text)` | User text, before the LLM. |
+| `check_untrusted(text, question=)` | A retrieved page or file, before it enters the prompt. |
+| `check_tool_call(name, arguments, prompt=)` | A tool call, before it runs. |
+| `check_tool_result(text, name=, prompt=)` | What the tool returned. |
+| `check_output(text, prompt=)` | The LLM reply, before you show it. |
+
+`prompt=` and `question=` take the `check_input` result.
+
 <details>
 <summary><b>Check the reply too</b></summary>
 
@@ -87,7 +97,7 @@ if question.ok:
     print(answer.onward)
 ```
 
-The same pattern covers every step: `check_untrusted` (retrieved pages), `check_tool_call`, `check_tool_result` and `check_output`. For a full LangChain agent with middleware, see [`examples/langchain_agent.py`](examples/langchain_agent.py).
+For a full LangChain agent with middleware, see [`examples/langchain_agent.py`](examples/langchain_agent.py).
 
 </details>
 
