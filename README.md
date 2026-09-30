@@ -70,13 +70,13 @@ print(result.onward)  # "Blocked: injection."
 
 `result.ok` says whether to continue. `result.onward` is the text to pass on: the original text, a redacted version, or a block message.
 
-| Method | When |
-| --- | --- |
-| `check_input(text)` | User text, before the LLM. |
-| `check_untrusted(text, question=)` | A retrieved page or file, before it enters the prompt. |
-| `check_tool_call(name, arguments, prompt=)` | A tool call, before it runs. |
-| `check_tool_result(text, name=, prompt=)` | What the tool returned. |
-| `check_output(text, prompt=)` | The LLM response, before you show it. |
+| Method | Returns | When |
+| --- | --- | --- |
+| `check_input(text: str)` | `InputResult` | User text, before the LLM. |
+| `check_untrusted(text: str, question: str \| InputResult = None)` | `ScanResult` | A retrieved page or file, before it enters the prompt. |
+| `check_tool_call(name: str, arguments: str \| dict, prompt: str \| InputResult)` | `ScanResult` | A tool call, before it runs. |
+| `check_tool_result(text: str, name: str, prompt: str \| InputResult = None)` | `ScanResult` | What the tool returned. |
+| `check_output(text: str, prompt: str \| InputResult)` | `ScanResult` | The LLM response, before you show it. |
 
 `prompt=` and `question=` take the `check_input` result.
 
