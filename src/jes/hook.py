@@ -4,22 +4,25 @@ from __future__ import annotations
 
 import fcntl
 import json
-import math
 import os
 import re
 import sys
-import tomllib
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
 from typing import Literal, cast
 
 from jes import Guard
-from jes._engine.core import freeze_arguments, require_tool_name
+from jes.config import load_policies
 from jes.errors import PolicyError
 from jes.judge import ModelSpec
-from jes.policies import Policy, allowed_tools, hazards, indirect_injection, injection
+from jes.payload import (
+    ConfigError,
+    freeze_arguments,
+    optional_str,
+    require_tool_name,
+)
 from jes.types import ScanResult, Stage
 
 _SESSION_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$")
@@ -33,18 +36,7 @@ _FAILURE_TEXT: dict[Stage, str] = {
 }
 
 
-class ConfigError(Exception):
-    """A profile or hook payload is invalid. The message is safe to print."""
-
-
-@dataclass(frozen=True, slots=True)
-class Profile:
-    """A user-owned coding profile. Threshold and model are explicit."""
-
-    model: str
-    threshold: float
-    hazards: tuple[str, ...] | None
-    allowed_tools: tuple[str, ...]
+_DEFAULT_MODEL = "jev-latest"
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,72 +85,13 @@ def config_home() -> Path:
     return Path.home() / ".config"
 
 
-def default_profile_path() -> Path:
-    return config_home() / "jes" / "profile.toml"
-
-
 def default_session_dir() -> Path:
     return config_home() / "jes" / "sessions"
 
 
-def resolve_profile(explicit: str | None) -> Path:
-    """Choose the profile file. The packaged example is never loaded by itself."""
-
-    if explicit:
-        return Path(explicit)
-    env = os.environ.get("JES_PROFILE", "").strip()
-    if env:
-        return Path(env)
-    default = default_profile_path()
-    if default.is_file():
-        return default
-    raise ConfigError(
-        "set --profile or JES_PROFILE, or copy jes/data/coding.toml to " + str(default)
-    )
-
-
-def load_profile(path: Path) -> Profile:
-    """Load a profile. ``threshold`` and ``model`` must be set in the file."""
-
-    if not path.is_file():
-        raise ConfigError("profile not found")
-    try:
-        parsed = tomllib.loads(path.read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError) as error:
-        raise ConfigError("invalid profile") from error
-    values = cast(dict[str, object], parsed)
-    if "threshold" not in values:
-        raise ConfigError("profile requires threshold")
-    if "model" not in values:
-        raise ConfigError("profile requires model")
-    hazards_value = _hazard_categories(values)
-    return Profile(
-        model=_model_name(values["model"]),
-        threshold=_threshold(values["threshold"]),
-        hazards=hazards_value,
-        allowed_tools=_name_list(values.get("allowed_tools"), field="allowed_tools"),
-    )
-
-
-def policies_from_profile(profile: Profile) -> Sequence[Policy]:
-    """Build the coding-agent policies. An empty tool list omits the name gate."""
-
-    threshold = profile.threshold
-    chosen: list[object] = [
-        injection(threshold=threshold),
-        indirect_injection(threshold=threshold),
-        hazards(profile.hazards, threshold=threshold)
-        if profile.hazards is not None
-        else hazards(threshold=threshold),
-    ]
-    if profile.allowed_tools:
-        chosen.append(allowed_tools(profile.allowed_tools))
-    return cast(Sequence[Policy], chosen)
-
-
-def open_guard(profile: Profile, model: ModelSpec | None) -> Guard:
-    chosen = profile.model if model is None else model
-    return Guard(policies_from_profile(profile), model=chosen)
+def open_guard(model: ModelSpec | None = None) -> Guard:
+    chosen = _DEFAULT_MODEL if model is None else model
+    return Guard(load_policies(), model=chosen)
 
 
 class SessionStore:
@@ -248,8 +181,8 @@ def event_from_payload(payload: Mapping[str, object]) -> HookEvent:
     stage = payload.get("stage")
     if not isinstance(stage, str) or stage not in _STAGES:
         raise ConfigError("invalid stage")
-    prompt = _optional_str(payload, "prompt")
-    session_id = _optional_str(payload, "session_id")
+    prompt = optional_str(payload, "prompt")
+    session_id = optional_str(payload, "session_id")
     if stage == "tool_call":
         tool = _required_tool(payload)
         arguments = _arguments(payload)
@@ -342,58 +275,8 @@ def _labels(result: ScanResult) -> tuple[str, ...]:
     )
 
 
-def _threshold(value: object) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise ConfigError("profile requires threshold")
-    if not math.isfinite(float(value)):
-        raise ConfigError("profile requires threshold")
-    return float(value)
-
-
-def _model_name(value: object) -> str:
-    if not isinstance(value, str) or not value or value.strip() != value:
-        raise ConfigError("profile requires model")
-    return value
-
-
-def _hazard_categories(values: Mapping[str, object]) -> tuple[str, ...] | None:
-    if "hazards" not in values:
-        return None
-    categories = _string_list(values["hazards"], field="hazards")
-    if not categories:
-        raise ConfigError("profile hazards must name at least one category")
-    return categories
-
-
-def _name_list(value: object, *, field: str) -> tuple[str, ...]:
-    if value is None:
-        return ()
-    return _string_list(value, field=field)
-
-
-def _string_list(value: object, *, field: str) -> tuple[str, ...]:
-    if not isinstance(value, list):
-        raise ConfigError(f"profile {field} must be a list of strings")
-    items = cast(list[object], value)
-    names: list[str] = []
-    for item in items:
-        if not isinstance(item, str) or not item or item.strip() != item:
-            raise ConfigError(f"profile {field} must be a list of strings")
-        names.append(item)
-    return tuple(names)
-
-
-def _optional_str(payload: Mapping[str, object], key: str) -> str | None:
-    if key not in payload or payload[key] is None:
-        return None
-    value = payload[key]
-    if not isinstance(value, str):
-        raise ConfigError(f"invalid {key}")
-    return value
-
-
 def _required_str(payload: Mapping[str, object], key: str) -> str:
-    value = _optional_str(payload, key)
+    value = optional_str(payload, key)
     if value is None:
         raise ConfigError(f"invalid {key}")
     return value

@@ -10,7 +10,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jes claude-hook",
+            "command": "uvx jes claude-hook",
             "timeout": 60
           }
         ]
@@ -21,7 +21,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jes claude-hook",
+            "command": "uvx jes claude-hook",
             "timeout": 60
           }
         ]
@@ -32,7 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jes claude-hook",
+            "command": "uvx jes claude-hook",
             "timeout": 60
           }
         ]
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jes claude-hook",
+            "command": "uvx jes claude-hook",
             "timeout": 60
           }
         ]
