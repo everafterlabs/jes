@@ -10,7 +10,8 @@ The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Add the `jes` command. Agent hooks run with `uvx jes`.
 - Add Claude Code, Codex, and Hermes hook commands, plus OpenCode, OpenClaw, and Pi plugins.
-- `jes login` saves the TypeSafe API key. Hooks read `~/.config/jes/config.json` for which guards run and their settings.
+- `jes login` saves the TypeSafe API key and writes `~/.config/jes/config.json`. Hooks read that file for which guards run and their settings.
+- Add `tool_safety`, a judgment of whether a tool call and its arguments are safe for the user's request. It is off in the default config, and the threshold is required.
 
 ## 1.0.3
 
