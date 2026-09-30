@@ -178,6 +178,8 @@ All run offline on `FakeBackend`, except `live_typesafe.py`.
 
 **How do I protect an AI agent from prompt injection?** Check more than the user's message. Most attacks are *indirect*: hidden in a web page, a file or a tool result. Use `indirect_injection` on `check_untrusted` and `check_tool_result`, and gate tools with `allowed_tools` and `tool_safety`.
 
+**Why a decision model instead of an LLM-as-judge?** An LLM judge reads the attack as part of its own prompt, and the attack can steer its answer. Jev only answers typed questions with probabilities, and the checked text is never part of an instruction. It also classifies instead of generating, so there's no long reply to wait on or pay for. That keeps latency and cost low enough to check every step, not just the first prompt. `AsyncGuard` runs each check's judgments in parallel, so adding guards doesn't add their latencies up.
+
 **Does jes send my secrets or personal data to a model?** No. `secrets` and `pii` run locally first, and judgments only see the redacted text.
 
 **Does it cover subagents and skills?** In Claude Code, yes. They are tool calls, so the hooks check them, and the hooks also run inside subagents.
