@@ -1,0 +1,23 @@
+# Hermes shell hooks. Copy the hooks map into ~/.hermes/config.yaml.
+# The hook command is `uvx jes hermes-hook`. uvx ships with uv, so there is
+# no separate jes install. Trust the hook when Hermes asks.
+#
+# pre_tool_call: a failed check prints action block and exits 2.
+# Set fail_closed so a crashed hook does not allow the call.
+# pre_llm_call: a blocked user message is injected as context.
+# Hermes does not reject the user message.
+# Shell hooks cannot replace a tool result or the assistant reply.
+
+limits:
+  - "pre_tool_call: a failed check prints action block and exits 2. Set fail_closed so a crashed hook does not allow the call."
+  - "pre_llm_call: a blocked user message is injected as context. Hermes does not reject the user message."
+  - "Shell hooks cannot replace a tool result or the assistant reply."
+
+hooks:
+  pre_llm_call:
+    - command: uvx jes hermes-hook
+      timeout: 60
+  pre_tool_call:
+    - command: uvx jes hermes-hook
+      timeout: 60
+      fail_closed: true

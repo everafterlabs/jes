@@ -7,6 +7,7 @@ from collections.abc import Mapping, Sequence
 
 from jes.errors import BackendError, DeadlineExceeded, PolicyError, PolicyExecutionError
 from jes.judge import ModelSpec, RequestContext, SyncBackend, resolve_judge
+from jes.payload import freeze_arguments, require_tool_name
 from jes.policies import Policy
 from jes.redactions import Redactions
 from jes.types import Finding, History, InputResult, ScanResult, Stage
@@ -17,8 +18,6 @@ from .core import (
     ContextValue,
     OnBackendError,
     RequestExecution,
-    freeze_arguments,
-    require_tool_name,
 )
 from .limits import GuardLimits, ResourceLimit
 

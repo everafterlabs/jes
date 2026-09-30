@@ -1,12 +1,14 @@
-"""Load the nearest project ``.env`` into the process environment."""
+"""Load API keys from the environment and dotenv files."""
 
 from __future__ import annotations
 
 import os
-from collections.abc import MutableMapping
+from collections.abc import Mapping, MutableMapping
 from pathlib import Path
 
 _NAME_LINE = 'name = "jes"'
+_CONFIG_KEYS = ("TYPESAFE_API_KEY",)
+_RETIRED_KEYS = frozenset({"JES_MODEL", "JES_THRESHOLD", "JES_HAZARDS", "JES_ALLOWED_TOOLS"})
 
 
 def load_project_env(start: Path | None = None) -> None:
@@ -20,6 +22,54 @@ def load_project_env(start: Path | None = None) -> None:
         apply_env_file(path, os.environ)
 
 
+def user_env_path() -> Path:
+    """``~/.config/jes/.env``, honoring ``XDG_CONFIG_HOME``."""
+
+    raw = os.environ.get("XDG_CONFIG_HOME", "").strip()
+    home = Path(raw) if raw else Path.home() / ".config"
+    return home / "jes" / ".env"
+
+
+def load_config(
+    start: Path | None = None,
+    *,
+    environ: MutableMapping[str, str] | None = None,
+    user_env: Path | None = None,
+) -> None:
+    """Fill missing variables from dotenv files.
+
+    The first value wins: the process environment, ``.env.local`` then ``.env``
+    at the git repo root, then ``~/.config/jes/.env``.
+    """
+
+    env = os.environ if environ is None else environ
+    root = _repo_root(Path.cwd() if start is None else start)
+    config = user_env if user_env is not None else user_env_path()
+    for path in (root / ".env.local", root / ".env", config):
+        if path.is_file():
+            apply_env_file(path, env)
+
+
+def write_config(path: Path, values: Mapping[str, str]) -> None:
+    """Store dotenv keys, replacing previous values and keeping every other line."""
+
+    directory = path.parent
+    directory.mkdir(parents=True, exist_ok=True)
+    os.chmod(directory, 0o700)
+    kept: list[str] = []
+    if path.is_file():
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            parsed = _parse_line(raw)
+            if parsed is not None and (parsed[0] in values or parsed[0] in _RETIRED_KEYS):
+                continue
+            kept.append(raw)
+    for name in _CONFIG_KEYS:
+        if name in values:
+            kept.append(f"{name}={_quote(values[name])}")
+    path.write_text("\n".join(kept) + "\n", encoding="utf-8")
+    os.chmod(path, 0o600)
+
+
 def apply_env_file(path: Path, environ: MutableMapping[str, str]) -> None:
     """Set missing keys from a dotenv file. Existing values and blank lines are kept."""
 
@@ -31,6 +81,23 @@ def apply_env_file(path: Path, environ: MutableMapping[str, str]) -> None:
         if key in environ or value == "":
             continue
         environ[key] = value
+
+
+def _repo_root(start: Path) -> Path:
+    current = start.resolve()
+    if current.is_file():
+        current = current.parent
+    for directory in (current, *current.parents):
+        if (directory / ".git").exists():
+            return directory
+    return current
+
+
+def _quote(value: str) -> str:
+    escaped = (
+        value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\t", "\\t")
+    )
+    return f'"{escaped}"'
 
 
 def _project_root(start: Path) -> Path | None:

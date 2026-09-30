@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 import secrets
 import time
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Literal, TypeAlias, cast
+from typing import Literal, TypeAlias
 
 from jes.errors import (
     BackendError,
@@ -94,59 +93,6 @@ def _history_projection(entry: History) -> tuple[Role, Stage, ContextValue]:
     if entry.stage == "tool_result":
         return "tool", "tool_result", entry
     return "assistant", "output", entry
-
-
-def require_tool_name(name: str) -> str:
-    if not name or len(name) > 256 or name.strip() != name or any(ord(char) < 32 for char in name):
-        raise PolicyError("tool name must be a non-empty single-line string")
-    return name
-
-
-def _require_json(value: object) -> None:
-    if value is None or isinstance(value, (str, bool, int)):
-        return
-    if isinstance(value, float):
-        if not math.isfinite(value):
-            raise PolicyError("tool arguments must be JSON values")
-        return
-    if isinstance(value, Mapping):
-        items = cast(Mapping[object, object], value)
-        for key, item in items.items():
-            if not isinstance(key, str):
-                raise PolicyError("tool arguments must be JSON values")
-            _require_json(item)
-        return
-    if isinstance(value, list):
-        elements = cast(list[object], value)
-        for item in elements:
-            _require_json(item)
-        return
-    raise PolicyError("tool arguments must be JSON values")
-
-
-def _plain_json(value: object) -> object:
-    if isinstance(value, Mapping):
-        items = cast(Mapping[str, object], value)
-        return {key: _plain_json(item) for key, item in items.items()}
-    if isinstance(value, list):
-        elements = cast(list[object], value)
-        return [_plain_json(item) for item in elements]
-    return value
-
-
-def freeze_arguments(arguments: str | Mapping[str, object]) -> str:
-    """Keep a string subject, or serialize a mapping one canonical way."""
-
-    if isinstance(arguments, str):
-        return arguments
-    _require_json(arguments)
-    return json.dumps(
-        _plain_json(arguments),
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-        allow_nan=False,
-    )
 
 
 @dataclass(slots=True)

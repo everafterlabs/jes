@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from hypothesis import given
-from hypothesis import strategies as st
+from hypothesis import given, strategies as st
 
 from jes._engine.merge import merge_findings, merge_scores
 from jes._engine.plan import chunk_text

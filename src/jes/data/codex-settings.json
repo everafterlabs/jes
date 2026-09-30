@@ -1,0 +1,53 @@
+{
+  "limits": [
+    "PostToolUse fires after the tool has already run. decision block replaces the model-facing result with the refusal. It does not undo the command.",
+    "Stop checks the assistant reply and continues the turn with the refusal. It does not change text already on screen. A second Stop with stop_hook_active is skipped so a refusal does not loop.",
+    "Codex ignores a hook until you trust its exact text."
+  ],
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uvx jes codex-hook",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uvx jes codex-hook",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uvx jes codex-hook",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uvx jes codex-hook",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

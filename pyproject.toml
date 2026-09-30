@@ -42,6 +42,9 @@ Documentation = "https://docs.getjes.dev"
 Repository = "https://github.com/everafterlabs/jes"
 Issues = "https://github.com/everafterlabs/jes/issues"
 
+[project.scripts]
+jes = "jes.cli:main"
+
 [dependency-groups]
 dev = [
   "cryptography>=50.0.1",
@@ -76,6 +79,9 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]

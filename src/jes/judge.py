@@ -12,21 +12,13 @@ from typing import Any, Literal, Protocol, TypeAlias, TypeVar, cast, runtime_che
 import langchain_typesafe
 from langchain_typesafe import (
     Choice as TypeSafeChoice,
-)
-from langchain_typesafe import (
     ChoiceAnswer as TypeSafeChoiceAnswer,
-)
-from langchain_typesafe import (
     Noul,
     NoulAnswer,
     NoulCriteria,
-    TypeSafeClassifier,
-)
-from langchain_typesafe import (
     Score as TypeSafeScore,
-)
-from langchain_typesafe import (
     ScoreAnswer as TypeSafeScoreAnswer,
+    TypeSafeClassifier,
 )
 from langchain_typesafe.client import TypeSafeError
 from langchain_typesafe.types import ClassifierRequest
