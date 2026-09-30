@@ -26,7 +26,7 @@
 
 ## Why jes
 
-- **A decision model, not an LLM.** Every judgment runs on [Jev](https://typesafe.ai/), TypeSafe's System One decision model. It classifies instead of generating, so injected text can't talk it out of its verdict.
+- **A decision model, not an LLM.** Every judgment runs on a System One decision model like [Jev](https://typesafe.ai/) or Laya. It classifies instead of generating, so injected text can't talk it out of its verdict.
 - **Every step of the agent.** Prompt, retrieved page, skill, subagent, tool call, tool result and reply.
 - **Secrets stay local.** Secrets and PII are redacted in your process before any model sees the text.
 - **Your thresholds.** No magic defaults. Pin the model (`jev-1.13.0`) once you've tuned them.
