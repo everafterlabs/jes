@@ -1,0 +1,71 @@
+{
+  "guards": {
+    "injection": {
+      "enabled": true,
+      "threshold": 0.5
+    },
+    "indirect_injection": {
+      "enabled": true,
+      "threshold": 0.5
+    },
+    "hazards": {
+      "enabled": true,
+      "threshold": 0.5
+    },
+    "toxicity": {
+      "enabled": false,
+      "threshold": 0.5
+    },
+    "topics": {
+      "enabled": false,
+      "threshold": 0.5,
+      "deny": []
+    },
+    "invisible_text": {
+      "enabled": false,
+      "mode": "targeted",
+      "block": false
+    },
+    "allowed_tools": {
+      "enabled": false,
+      "names": []
+    },
+    "canary": {
+      "enabled": false,
+      "token": ""
+    },
+    "regex": {
+      "enabled": false,
+      "patterns": [],
+      "action": "block",
+      "match": "search",
+      "require": false,
+      "fold": false,
+      "timeout_ms": 50
+    },
+    "substrings": {
+      "enabled": false,
+      "terms": [],
+      "action": "block",
+      "whole_words": false,
+      "fold": true
+    },
+    "token_limit": {
+      "enabled": false,
+      "limit": 8000,
+      "encoding": "cl100k_base",
+      "mode": "block"
+    },
+    "pii": {
+      "enabled": false,
+      "input_mode": "redact",
+      "untrusted_mode": "mask",
+      "output_mode": "flag",
+      "restore": true
+    },
+    "secrets": {
+      "enabled": false,
+      "redact": "all"
+    }
+  }
+}
