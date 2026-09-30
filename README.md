@@ -81,19 +81,24 @@ print(result.onward)  # "Blocked: injection."
 `prompt=` and `question=` take the `check_input` result.
 
 <details>
-<summary><b>Check the reply too</b></summary>
+<summary><b>Guard a RAG app</b></summary>
 
-With a LangChain chat model:
+Check the question, every retrieved chunk, and the reply. With a LangChain chat model:
 
 ```python
 from langchain.chat_models import init_chat_model
+from jes.policies import indirect_injection, injection
 
+guard = Guard([injection(threshold=0.5), indirect_injection(threshold=0.5)], model="jev-latest")
 llm = init_chat_model("anthropic:claude-sonnet-5-5")
 
-question = guard.check_input("What's the capital of France?")
+question = guard.check_input("What's our refund policy?")
 if question.ok:
-    reply = llm.invoke(question.onward).text
-    answer = guard.check_output(reply, prompt=question)  # prompt= tells the judge what was asked
+    chunks = [guard.check_untrusted(doc.page_content, question=question) for doc in retriever.invoke(question.onward)]
+    sources = [chunk for chunk in chunks if chunk.ok]  # drop poisoned pages
+    context = "\n\n".join(chunk.onward for chunk in sources)
+    reply = llm.invoke(f"{context}\n\nQuestion: {question.onward}").text
+    answer = guard.check_output(reply, prompt=question, sources=sources)  # the judge sees what was asked and retrieved
     print(answer.onward)
 ```
 
