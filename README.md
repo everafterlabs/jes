@@ -45,26 +45,6 @@ retrieved page ─▶ check_untrusted
 - **You own the thresholds.** jes publishes no magic defaults. Every judgment takes an explicit `threshold=`, and you can pin the model (`jev-1.13.0`) once your thresholds are tuned.
 - **Guards your coding agent in two commands.** Hooks for Claude Code, Codex, Hermes, OpenCode, OpenClaw and Pi, run through `uvx`, with nothing to install globally.
 
-## Protect your coding agent
-
-```bash
-uvx jes login            # saves TYPESAFE_API_KEY and writes ~/.config/jes/config.json
-uvx jes claude-settings  # prints the hooks to merge into ~/.claude/settings.json
-```
-
-The default config enables `injection`, `indirect_injection` and `hazards` at threshold `0.5`. Turn guards on or off in `~/.config/jes/config.json`.
-
-| Agent | Setup | Prompt | Tool call | Tool result | Reply |
-| --- | --- | :---: | :---: | :---: | :---: |
-| Claude Code | `uvx jes claude-settings` | ✅ | ✅ | ✅ | ✅ on screen |
-| Codex | `uvx jes codex-settings` | ✅ | ✅ | ✅ | ✅ |
-| Hermes | `uvx jes hermes-settings` | ✅ | ✅ | — | — |
-| OpenCode | `uvx jes opencode-settings` | ✅ | ✅ | ✅ | — |
-| OpenClaw | `uvx jes openclaw-settings` | ✅ | ✅ | ✅ | ✅ |
-| Pi | `uvx jes pi-settings` | ✅ | ✅ | ✅ | — |
-
-A blocked tool call is refused before the tool runs. OpenCode, OpenClaw and Pi also need the runner that `uvx jes runner-settings` prints. The per-agent details and the limits of each host are in the [guide](docs/guide.md).
-
 ## Use it in your app
 
 ```bash
@@ -117,6 +97,26 @@ if call.ok:
 | `check_output(text, prompt=)` | The LLM reply, before you show it |
 
 Every result carries `decision` (`"allow"` or `"block"`), `ok`, `findings`, `scores` (a probability for each question asked) and `onward`. `AsyncGuard` is the async twin of `Guard`.
+
+## Protect your coding agent
+
+```bash
+uvx jes login            # saves TYPESAFE_API_KEY and writes ~/.config/jes/config.json
+uvx jes claude-settings  # prints the hooks to merge into ~/.claude/settings.json
+```
+
+The default config enables `injection`, `indirect_injection` and `hazards` at threshold `0.5`. Turn guards on or off in `~/.config/jes/config.json`.
+
+| Agent | Setup | Prompt | Tool call | Tool result | Reply |
+| --- | --- | :---: | :---: | :---: | :---: |
+| Claude Code | `uvx jes claude-settings` | ✅ | ✅ | ✅ | ✅ on screen |
+| Codex | `uvx jes codex-settings` | ✅ | ✅ | ✅ | ✅ |
+| Hermes | `uvx jes hermes-settings` | ✅ | ✅ | — | — |
+| OpenCode | `uvx jes opencode-settings` | ✅ | ✅ | ✅ | — |
+| OpenClaw | `uvx jes openclaw-settings` | ✅ | ✅ | ✅ | ✅ |
+| Pi | `uvx jes pi-settings` | ✅ | ✅ | ✅ | — |
+
+A blocked tool call is refused before the tool runs. OpenCode, OpenClaw and Pi also need the runner that `uvx jes runner-settings` prints. The per-agent details and the limits of each host are in the [guide](docs/guide.md).
 
 ## Guards
 
