@@ -1,12 +1,12 @@
 <p align="center">
   <a href="https://getjes.dev">
-    <img src="docs/assets/banner.png" alt="jes: guardrails for every hop of an agent turn" width="100%">
+    <img src="docs/assets/banner.png" alt="jes: open-source guardrails for AI agents. Prompt injection protection for every prompt, skill, subagent, tool call and reply" width="100%">
   </a>
 </p>
 
 <p align="center">
-  <strong>Open-source guardrails for AI agents.</strong><br>
-  Check the prompt, the retrieved page, the tool call, the tool result and the reply, before any of them is trusted.
+  <strong>Open-source guardrails for AI agents, powered by a decision model, not an LLM.</strong><br>
+  Stop prompt injection, jailbreaks, data leaks and risky tool calls at every step of an agent: the prompt, the retrieved page, the skill, the subagent, the tool call, the tool result and the reply.
 </p>
 
 <p align="center">
@@ -39,13 +39,13 @@ retrieved page ─▶ check_untrusted
 
 ## Why jes
 
+- **Powered by a decision model, not an LLM.** Most guardrails ask another LLM whether the text is safe. That judge reads the attacker's text as part of its prompt, so it can be talked out of its verdict. jes judges with [Jev](https://typesafe.ai/), TypeSafe's System One decision model. Jev classifies instead of generating: typed questions go in (yes/no, choice or score) and a probability comes out for each, in one call. The checked text is never spliced into an instruction, and there is no generated answer to steer, so injected text has nothing to hijack.
 - **Every hop, not just the prompt.** Five checks cover user input, retrieved text, tool calls, tool results and the reply. Indirect prompt injection gets caught where it enters, in the page or the tool output.
 - **Secrets never reach the judge.** Local transforms run first, in your process: secrets, PII, invisible characters, regex, canaries and tool allow-lists. Judgments only see the sanitized text.
-- **A judge that can't be talked out of it.** Judgments run on [JEV](https://typesafe.ai/), TypeSafe's decision model. It classifies instead of generating: typed questions go in and a probability comes out. The checked text is never spliced into an instruction, so there is nothing for injected text to hijack.
 - **You own the thresholds.** jes publishes no magic defaults. Every judgment takes an explicit `threshold=`, and you can pin the model (`jev-1.13.0`) once your thresholds are tuned.
-- **Guards your coding agent in two commands.** Hooks for Claude Code, Codex, Hermes, OpenCode, OpenClaw and Pi, run through `uvx`, with nothing to install globally.
+- **Guards your coding agent in two commands.** Hooks for Claude Code, Codex, Hermes, OpenCode, OpenClaw and Pi, run through `uvx`, with nothing to install globally. In Claude Code that includes every skill load, every subagent launch and every tool call a subagent makes.
 
-## Use it in your app
+## Add guardrails to your AI agent (Python)
 
 ```bash
 pip install jes
@@ -98,7 +98,7 @@ if call.ok:
 
 Every result carries `decision` (`"allow"` or `"block"`), `ok`, `findings`, `scores` (a probability for each question asked) and `onward`. `AsyncGuard` is the async twin of `Guard`.
 
-## Protect your coding agent
+## Guardrails for Claude Code, Codex and other coding agents
 
 ```bash
 uvx jes login            # saves TYPESAFE_API_KEY and writes ~/.config/jes/config.json
@@ -118,9 +118,9 @@ The default config enables `injection`, `indirect_injection` and `hazards` at th
 
 A blocked tool call is refused before the tool runs. OpenCode, OpenClaw and Pi also need the runner that `uvx jes runner-settings` prints. The per-agent details and the limits of each host are in the [guide](docs/guide.md).
 
-## Guards
+## Guards: prompt injection, PII, secrets and tool calls
 
-Transforms run locally, with no model call. Judgments ask JEV and take `threshold=`.
+Transforms run locally, with no model call. Judgments ask Jev and take `threshold=`.
 
 | Guard | Kind | Catches |
 | --- | --- | --- |
@@ -159,7 +159,39 @@ Each of these runs offline on `FakeBackend`, except `live_typesafe.py`.
 | [`langgraph_agent.py`](examples/langgraph_agent.py) | A LangGraph graph checked at each node |
 | [`async_check.py`](examples/async_check.py) | The same check on `AsyncGuard` |
 | [`failures.py`](examples/failures.py) | Backend errors and byte caps: an incomplete result is never ok |
-| [`live_typesafe.py`](examples/live_typesafe.py) | One live check against JEV |
+| [`live_typesafe.py`](examples/live_typesafe.py) | One live check against Jev |
+
+## Works with LangChain, LangGraph and your agent framework
+
+jes is plain Python, so it fits wherever your agent reads text or runs a tool. The repo has complete [LangChain](examples/langchain_agent.py) and [LangGraph](examples/langgraph_agent.py) examples. The OpenAI Agents SDK, the Claude Agent SDK, FastMCP and a hand-rolled loop plug in through each framework's own hooks, and `AsyncGuard` covers async stacks. On the coding-agent side: Claude Code, Codex, Hermes, OpenCode, OpenClaw and Pi.
+
+## FAQ
+
+**What is jes?**
+An open-source (Apache-2.0) Python library that adds guardrails to AI agents. It checks the user's prompt, retrieved text, tool calls, tool results and the model's reply, and returns a decision your code acts on.
+
+**How do I protect an AI agent from prompt injection?**
+Check more than the user's message. Most real attacks are *indirect*: instructions hidden in a web page, a file or a tool result. Run `check_untrusted` on retrieved text and `check_tool_result` on tool output with `indirect_injection`, and gate tools with `check_tool_call`, `allowed_tools` and `tool_safety`.
+
+**Why a decision model instead of an LLM-as-judge?**
+An LLM judge reads the attack as part of its own prompt and generates an answer, so the attack can steer that answer. Jev only classifies: it answers typed questions with probabilities, and the checked text is never part of an instruction.
+
+**Does jes send my secrets or personal data to a model?**
+No. The `secrets` and `pii` transforms run locally, before any judgment, and judgments only see the sanitized text. `pii` can restore the original values in the reply.
+
+**Does it cover subagents and skills?**
+In Claude Code, yes. Skill loads and subagent launches are tool calls, so they go through the `PreToolUse` check, and the hooks also fire for tool calls made inside a subagent.
+
+**What thresholds should I use?**
+jes doesn't publish defaults. Start around `0.5`, measure on your own traffic, then pin the model version (`jev-1.13.0`) so your thresholds stay valid.
+
+## Learn more
+
+- [How to protect AI agents from prompt injection](https://www.getjes.dev/blog/prompt-injection-ai-agents)
+- [Add guardrails to a LangChain or LangGraph agent](https://www.getjes.dev/blog/langchain-langgraph-guardrails)
+- [AI agent guardrails compared: jes, LLM Guard, NeMo Guardrails, Guardrails AI and Lakera Guard](https://www.getjes.dev/blog/ai-agent-guardrails-compared)
+- [What is Jev? The decision model behind jes](https://www.getjes.dev/blog/what-is-jev)
+- [FAQ](https://www.getjes.dev/faq) · [Docs](https://docs.getjes.dev) · [getjes.dev](https://getjes.dev)
 
 ## Install extras
 
@@ -198,6 +230,6 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code 
 
 Apache-2.0.
 
-This project is independent. It isn't affiliated with TypeSafe, Meta, or Protect AI. The name is one letter off Jev, and the package doesn't include their weights.
+This project is independent. It isn't affiliated with [TypeSafe.ai](https://typesafe.ai).
 
 <p align="center"><a href="https://getjes.dev">getjes.dev</a></p>
