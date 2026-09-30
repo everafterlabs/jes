@@ -97,8 +97,8 @@ if question.ok:
     chunks = [guard.check_untrusted(doc.page_content, question=question) for doc in retriever.invoke(question.onward)]
     sources = [chunk for chunk in chunks if chunk.ok]  # drop poisoned pages
     context = "\n\n".join(chunk.onward for chunk in sources)
-    reply = llm.invoke(f"{context}\n\nQuestion: {question.onward}").text
-    answer = guard.check_output(reply, prompt=question, sources=sources)  # the judge sees what was asked and retrieved
+    response = llm.invoke(f"{context}\n\nQuestion: {question.onward}").text
+    answer = guard.check_output(response, prompt=question, sources=sources)  # the judge sees what was asked and retrieved
     print(answer.onward)
 ```
 
