@@ -73,12 +73,21 @@ print(result.onward)  # "Blocked: injection."
 <details>
 <summary><b>Check the reply too</b></summary>
 
+With a LangChain chat model:
+
 ```python
-reply = llm(result.onward)
-checked = guard.check_output(reply, prompt=result)  # prompt= tells the judge what was asked
+from langchain.chat_models import init_chat_model
+
+llm = init_chat_model("anthropic:claude-sonnet-5-5")
+
+question = guard.check_input("What's the capital of France?")
+if question.ok:
+    reply = llm.invoke(question.onward).text
+    answer = guard.check_output(reply, prompt=question)  # prompt= tells the judge what was asked
+    print(answer.onward)
 ```
 
-The same pattern covers every step: `check_untrusted` (retrieved pages), `check_tool_call`, `check_tool_result` and `check_output`.
+The same pattern covers every step: `check_untrusted` (retrieved pages), `check_tool_call`, `check_tool_result` and `check_output`. For a full LangChain agent with middleware, see [`examples/langchain_agent.py`](examples/langchain_agent.py).
 
 </details>
 
