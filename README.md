@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://getjes.dev">
-    <img src="docs/assets/banner.png" alt="jes: open-source guardrails for AI agents. Prompt injection protection for every prompt, skill, subagent, tool call and reply" width="100%">
+    <img src="docs/assets/banner.png" alt="jes: open-source guardrails for AI agents. Prompt injection protection for every prompt, skill, subagent, tool call and output" width="100%">
   </a>
 </p>
 
@@ -27,7 +27,7 @@
 ## Why jes
 
 - **A decision model, not an LLM.** Every judgment runs on a System One decision model like [Jev](https://typesafe.ai/) or Laya. It classifies instead of generating, so injected text can't talk it out of its verdict.
-- **Every step of the agent.** Prompt, retrieved page, skill, subagent, tool call, tool result and reply.
+- **Every step of the agent.** Prompt, retrieved page, skill, subagent, tool call, tool result and output.
 - **Secrets stay local.** Secrets and PII are redacted in your process before any model sees the text.
 - **Your thresholds.** No magic defaults. Pin the model (`jev-1.13.0`) once you've tuned them.
 
@@ -76,14 +76,14 @@ print(result.onward)  # "Blocked: injection."
 | `check_untrusted(text, question=)` | A retrieved page or file, before it enters the prompt. |
 | `check_tool_call(name, arguments, prompt=)` | A tool call, before it runs. |
 | `check_tool_result(text, name=, prompt=)` | What the tool returned. |
-| `check_output(text, prompt=)` | The LLM reply, before you show it. |
+| `check_output(text, prompt=)` | The LLM output, before you show it. |
 
 `prompt=` and `question=` take the `check_input` result.
 
 <details>
 <summary><b>Guard a RAG app</b></summary>
 
-Check the question, every retrieved chunk, and the reply. With a LangChain chat model:
+Check the question, every retrieved chunk, and the model's output. With a LangChain chat model:
 
 ```python
 from langchain.chat_models import init_chat_model
@@ -134,7 +134,7 @@ agent = create_agent("anthropic:claude-sonnet-5-5", tools=[TavilySearch(max_resu
 agent.invoke({"messages": [{"role": "user", "content": "What changed in the EU AI Act this year?"}]})
 ```
 
-To also check the input and the reply in the same middleware, see [`examples/langchain_agent.py`](examples/langchain_agent.py).
+To also check the input and the output in the same middleware, see [`examples/langchain_agent.py`](examples/langchain_agent.py).
 
 </details>
 
@@ -178,7 +178,7 @@ Swap `claude` for `codex`, `hermes`, `opencode`, `openclaw` or `pi`. In Claude C
 
 Each coding agent exposes different hooks, so jes can check different steps:
 
-| Coding agent | Your prompt | Tool call, before it runs | Tool result | Final reply |
+| Coding agent | Your prompt | Tool call, before it runs | Tool result | Final output |
 | --- | :---: | :---: | :---: | :---: |
 | [Claude Code](docs/guide.md#claude-code) | ✅ | ✅ | ✅ | ✅ screen only¹ |
 | [Codex](docs/guide.md#codex) | ✅ | ✅ | ✅ | ✅ |
@@ -187,7 +187,7 @@ Each coding agent exposes different hooks, so jes can check different steps:
 | [OpenClaw](docs/guide.md#openclaw) | ✅ | ✅ | ✅ | ✅ |
 | [Pi](docs/guide.md#pi) | ✅ | ✅ | ✅ | — |
 
-¹ A blocked reply is replaced on screen; the transcript keeps the original.
+¹ Blocked output is replaced on screen; the transcript keeps the original.
 
 OpenCode, OpenClaw and Pi also need the file that `uvx jes runner-settings` prints.
 
@@ -215,9 +215,9 @@ All run offline on `FakeBackend`, except `live_typesafe.py`.
 | Example | Shows |
 | --- | --- |
 | [`one_check.py`](examples/one_check.py) | A prompt injection blocked at input |
-| [`model_call.py`](examples/model_call.py) | User text, a retrieved page and the reply |
+| [`model_call.py`](examples/model_call.py) | User text, a retrieved page and the model output |
 | [`tool_calls.py`](examples/tool_calls.py) | A disallowed tool and a poisoned tool result |
-| [`pii_conversation.py`](examples/pii_conversation.py) | PII hidden on the way in, restored in the reply |
+| [`pii_conversation.py`](examples/pii_conversation.py) | PII hidden on the way in, restored in the output |
 | [`secrets_canary.py`](examples/secrets_canary.py) | A redacted secret and a leaked canary |
 | [`topics_toxicity.py`](examples/topics_toxicity.py) | Denied topics and toxicity |
 | [`custom_questions.py`](examples/custom_questions.py) | Custom yes/no, choice and score questions |
@@ -233,11 +233,11 @@ All run offline on `FakeBackend`, except `live_typesafe.py`.
 <details>
 <summary><b>FAQ</b></summary>
 
-**What is jes?** An open-source (Apache-2.0) Python library that adds guardrails to AI agents. It checks the prompt, retrieved text, tool calls, tool results and the reply.
+**What is jes?** An open-source (Apache-2.0) Python library that adds guardrails to AI agents. It checks the prompt, retrieved text, tool calls, tool results and the model's output.
 
 **How do I protect an AI agent from prompt injection?** Check more than the user's message. Most attacks are *indirect*: hidden in a web page, a file or a tool result. Use `indirect_injection` on `check_untrusted` and `check_tool_result`, and gate tools with `allowed_tools` and `tool_safety`.
 
-**Why a decision model instead of an LLM-as-judge?** An LLM judge reads the attack as part of its own prompt, and the attack can steer its answer. Jev only answers typed questions with probabilities, and the checked text is never part of an instruction. It also classifies instead of generating, so there's no long reply to wait on or pay for. That keeps latency and cost low enough to check every step, not just the first prompt. `AsyncGuard` runs each check's judgments in parallel, so adding guards doesn't add their latencies up.
+**Why a decision model instead of an LLM-as-judge?** An LLM judge reads the attack as part of its own prompt, and the attack can steer its answer. Jev only answers typed questions with probabilities, and the checked text is never part of an instruction. It also classifies instead of generating, so there's no long output to wait on or pay for. That keeps latency and cost low enough to check every step, not just the first prompt. `AsyncGuard` runs each check's judgments in parallel, so adding guards doesn't add their latencies up.
 
 **Does jes send my secrets or personal data to a model?** No. `secrets` and `pii` run locally first, and judgments only see the redacted text.
 
