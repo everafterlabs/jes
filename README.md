@@ -184,8 +184,6 @@ All run offline on `FakeBackend`, except `live_typesafe.py`.
 
 **Does it cover subagents and skills?** In Claude Code, yes. They are tool calls, so the hooks check them, and the hooks also run inside subagents.
 
-**What thresholds should I use?** jes publishes none. Start around `0.5`, measure on your own traffic, then pin the model version.
-
 </details>
 
 <details>
