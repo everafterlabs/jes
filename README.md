@@ -113,10 +113,11 @@ Check every tool call before it runs, and what it returns. With LangChain `creat
 from langchain.agents import create_agent
 from langchain.agents.middleware import wrap_tool_call
 from langchain.messages import ToolMessage
+from langchain_tavily import TavilySearch
 from jes.policies import allowed_tools, indirect_injection, tool_safety
 
 guard = Guard(
-    [allowed_tools(["search"]), tool_safety(threshold=0.5), indirect_injection(threshold=0.5)],
+    [allowed_tools(["tavily_search"]), tool_safety(threshold=0.5), indirect_injection(threshold=0.5)],
     model="jev-latest",
 )
 
@@ -129,8 +130,8 @@ def guard_tools(request, handler):
         checked = guard.check_tool_result(output, name=call["name"], prompt=prompt)
     return ToolMessage(checked.onward, tool_call_id=call["id"])  # a blocked call or poisoned page becomes a refusal
 
-agent = create_agent("anthropic:claude-sonnet-5-5", tools=[search], middleware=[guard_tools])
-agent.invoke({"messages": [{"role": "user", "content": "Summarize the quarterly notes."}]})
+agent = create_agent("anthropic:claude-sonnet-5-5", tools=[TavilySearch(max_results=3)], middleware=[guard_tools])
+agent.invoke({"messages": [{"role": "user", "content": "What changed in the EU AI Act this year?"}]})
 ```
 
 To also check the input and the reply in the same middleware, see [`examples/langchain_agent.py`](examples/langchain_agent.py).
