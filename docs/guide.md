@@ -55,6 +55,7 @@ The file `jes login` writes enables three guards and lists the others turned off
 - `topics`: `threshold` and `deny`, the topics to block. `deny` is required when the guard is enabled
 - `invisible_text`: `mode` (`targeted` or `all`) and `block`
 - `allowed_tools`: `names`, the tool names that may run. Required and non-empty when enabled
+- `tool_safety`: `threshold`. Judges the tool name and arguments against the user's request. `0.5` is the unset starting value, not a measured recommendation. Required when the guard is enabled
 - `canary`: `token`, the marker that must not appear. Required when enabled
 - `regex`: `patterns`, `action` (`block` or `redact`), `match` (`search` or `fullmatch`), `require`, `fold`, `timeout_ms`
 - `substrings`: `terms`, `action` (`block` or `redact`), `whole_words`, `fold`

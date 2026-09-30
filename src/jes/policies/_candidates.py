@@ -20,6 +20,7 @@ from jes.policies.prompts import (
     HAZARD_CODES,
     INDIRECT_INJECTION_V1,
     INJECTION_V1,
+    TOOL_SAFETY_V1,
     TOXICITY_LABELS,
     hazard_instruction,
     topic_instruction,
@@ -179,6 +180,19 @@ def injection_candidate(*, threshold: float | None = None) -> _Candidate:
         stages=("input", "untrusted", "tool_call"),
         context="none",
         version="injection.v1",
+        threshold=threshold,
+        summary=None,
+    )
+
+
+def tool_safety_candidate(*, threshold: float | None = None) -> _Candidate:
+    question = YesNo(TOOL_SAFETY_V1, task="tool_safety")
+    return _policy(
+        "tool_safety",
+        {"violation": question},
+        stages=("tool_call",),
+        context="optional",
+        version="tool_safety.v1",
         threshold=threshold,
         summary=None,
     )
