@@ -174,18 +174,22 @@ uvx jes claude-settings  # prints the hooks for ~/.claude/settings.json
 Swap `claude` for `codex`, `hermes`, `opencode`, `openclaw` or `pi`. In Claude Code, the hooks also check skill loads, subagent launches and every tool call inside a subagent.
 
 <details>
-<summary><b>What each agent checks</b></summary>
+<summary><b>What jes checks in each coding agent</b></summary>
 
-| Agent | Prompt | Tool call | Tool result | Reply |
+Each coding agent exposes different hooks, so jes can check different steps:
+
+| Coding agent | Your prompt | Tool call, before it runs | Tool result | Final reply |
 | --- | :---: | :---: | :---: | :---: |
-| Claude Code | ✅ | ✅ | ✅ | ✅ on screen |
-| Codex | ✅ | ✅ | ✅ | ✅ |
-| Hermes | ✅ | ✅ | — | — |
-| OpenCode | ✅ | ✅ | ✅ | — |
-| OpenClaw | ✅ | ✅ | ✅ | ✅ |
-| Pi | ✅ | ✅ | ✅ | — |
+| [Claude Code](docs/guide.md#claude-code) | ✅ | ✅ | ✅ | ✅ screen only¹ |
+| [Codex](docs/guide.md#codex) | ✅ | ✅ | ✅ | ✅ |
+| [Hermes](docs/guide.md#hermes) | ✅ | ✅ | — | — |
+| [OpenCode](docs/guide.md#opencode) | ✅ | ✅ | ✅ | — |
+| [OpenClaw](docs/guide.md#openclaw) | ✅ | ✅ | ✅ | ✅ |
+| [Pi](docs/guide.md#pi) | ✅ | ✅ | ✅ | — |
 
-OpenCode, OpenClaw and Pi also need the file that `uvx jes runner-settings` prints. Details are in the [guide](docs/guide.md).
+¹ A blocked reply is replaced on screen; the transcript keeps the original.
+
+OpenCode, OpenClaw and Pi also need the file that `uvx jes runner-settings` prints.
 
 </details>
 
