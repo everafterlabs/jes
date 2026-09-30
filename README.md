@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://getjes.dev">
-    <img src="https://raw.githubusercontent.com/everafterlabs/jes/main/docs/assets/banner.png" alt="jes: guardrails for every hop of an agent turn" width="100%">
+    <img src="docs/assets/banner.png" alt="jes: guardrails for every hop of an agent turn" width="100%">
   </a>
 </p>
 
