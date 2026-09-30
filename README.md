@@ -178,8 +178,6 @@ All run offline on `FakeBackend`, except `live_typesafe.py`.
 
 **How do I protect an AI agent from prompt injection?** Check more than the user's message. Most attacks are *indirect*: hidden in a web page, a file or a tool result. Use `indirect_injection` on `check_untrusted` and `check_tool_result`, and gate tools with `allowed_tools` and `tool_safety`.
 
-**Why a decision model instead of an LLM-as-judge?** An LLM judge reads the attack as part of its own prompt, and the attack can steer its answer. Jev only answers typed questions with probabilities, and the checked text is never part of an instruction.
-
 **Does jes send my secrets or personal data to a model?** No. `secrets` and `pii` run locally first, and judgments only see the redacted text.
 
 **Does it cover subagents and skills?** In Claude Code, yes. They are tool calls, so the hooks check them, and the hooks also run inside subagents.
@@ -194,14 +192,6 @@ All run offline on `FakeBackend`, except `live_typesafe.py`.
 `jes[pii]` (Presidio, plus a spaCy English model) · `jes[secrets]` (detect-secrets) · `jes[crypto]` (encrypted `Redactions`) · `jes[tokens]` (tiktoken) · `jes[regex]` · `jes[json]`. Python 3.11+.
 
 </details>
-
-## Learn more
-
-[Prompt injection in AI agents](https://www.getjes.dev/blog/prompt-injection-ai-agents) · [LangChain and LangGraph guardrails](https://www.getjes.dev/blog/langchain-langgraph-guardrails) · [AI agent guardrails compared](https://www.getjes.dev/blog/ai-agent-guardrails-compared) · [What is Jev?](https://www.getjes.dev/blog/what-is-jev) · [FAQ](https://www.getjes.dev/faq)
-
-## Scope
-
-jes publishes no measured default thresholds; tune them on your traffic. A hook can refuse a tool call before it runs, but can't undo one that already ran. Guardrails reduce risk; they don't replace least privilege or sandboxing. Report vulnerabilities through [SECURITY.md](SECURITY.md).
 
 ## Development
 
