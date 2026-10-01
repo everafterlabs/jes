@@ -102,6 +102,16 @@ uv run --group examples python -m examples.15_deep_agents.jev
 uv run --group examples python -m examples.14_langgraph.local   # fully local
 ```
 
+Public LangSmith traces of the `jev.py` runs. Each jes check shows up as a
+`TypeSafeClassifier` span. To trace your own runs, set `LANGSMITH_TRACING=true`
+and `LANGSMITH_API_KEY`.
+
+| Lesson | Clean | Injection | Poisoned tool |
+| --- | --- | --- | --- |
+| 13 LangChain | [trace](https://smith.langchain.com/public/5559188d-0d56-4d7d-a500-5f0b6aa06036/r) | [trace](https://smith.langchain.com/public/622e2643-e5d4-48da-89f6-8c6c1765d9b6/r) | [trace](https://smith.langchain.com/public/329cb54d-28bd-48a3-8513-bffd8cca167e/r) |
+| 14 LangGraph | [trace](https://smith.langchain.com/public/9fa1f399-ff5c-4dc3-b0cf-8bb363c4c08d/r) | [trace](https://smith.langchain.com/public/b5f77551-af80-42b6-8dd7-6c1700cc4ff9/r) | [trace](https://smith.langchain.com/public/cfb8f842-a7cb-4408-9d4d-d68a1ede35ca/r) |
+| 15 Deep Agents | [trace](https://smith.langchain.com/public/2793eacd-5a13-4b67-b4e4-9793d75a5eea/r) | [trace](https://smith.langchain.com/public/ac9f5ae4-e7e8-44dc-a036-e3daadd8f1f3/r) | [trace](https://smith.langchain.com/public/75881e00-d2fd-4ae9-8bef-9d92d4fff898/r) |
+
 Without LangChain, call the same checks around your own loop.
 `examples/11_openai_sdk/jev.py` guards an OpenAI Responses API tool loop.
 `examples/12_openai_agents_sdk/jev.py` uses jes as an OpenAI Agents SDK input and
