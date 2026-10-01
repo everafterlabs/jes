@@ -15,9 +15,9 @@ import pytest
 
 import jes
 from jes.agents.cli import main
-from jes.agents.hook import HookEvent, run_hook, tool_text
+from jes.agents.hook import HookEvent, _failure, run_hook, tool_text
 from jes.agents.sessions import SessionStore, default_session_dir
-from jes.errors import ConfigError
+from jes.errors import BackendError, ConfigError
 from jes.guard import Guard
 from jes.policies import injection
 from tests.agents.helpers import Down, allow, argv, block, run
@@ -156,7 +156,25 @@ def test_failed_checks_refuse_and_input_and_tool_calls_exit_2(
         assert code == exit_code, payload
         assert isinstance(body, dict) and body["decision"] == "block" and body["onward"] == onward
         assert down.decisions == 1
-        assert "check failed (BackendError)" in err
+        assert "check failed (BackendError: down)" in err
+
+
+def test_a_missing_api_key_says_to_log_in(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    payload = {"stage": "input", "text": "hello"}
+    down = Down("missing_api_key")
+    code, body, err = run(monkeypatch, capsys, argv("hook", tmp_path / "sessions"), payload, down)
+    assert code == 2
+    assert isinstance(body, dict) and body["decision"] == "block"
+    assert "TYPESAFE_API_KEY is not set; run jes login" in err
+
+
+def test_a_failure_names_only_the_error_type_and_reason() -> None:
+    assert _failure(ValueError("checked text")) == "ValueError"
+    assert _failure(BackendError("typesafe", "rejected", status_code=401)) == (
+        "BackendError: rejected"
+    )
 
 
 def test_malformed_hook_input(

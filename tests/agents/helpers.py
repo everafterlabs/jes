@@ -32,13 +32,14 @@ def block(question_id: str) -> FakeBackend:
 class Down(FakeBackend):
     """Counts its calls, then fails like a backend that is down."""
 
-    def __init__(self) -> None:
+    def __init__(self, reason: str = "down") -> None:
         super().__init__(default=SAFE)
         self.decisions = 0
+        self.reason = reason
 
     def decide(self, request: Request) -> Reply:
         self.decisions += 1
-        raise BackendError(self.name, "down")
+        raise BackendError(self.name, self.reason)
 
 
 def run(
