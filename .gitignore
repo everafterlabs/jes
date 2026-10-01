@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+# Local browser profiles from automation; never commit.
+prof/
+.coverage
+.hypothesis/
+.pytest_cache/
+.ruff_cache/
+.venv/
+__pycache__/
+*.egg-info/
+*.py[cod]
+build/
+dist/
+evals/cache/
+evals/results/

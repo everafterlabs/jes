@@ -1,0 +1,121 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jes"
+version = "0.0.1"
+description = "jes is a security toolkit for AI agents"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "MonkeyBuddy" }]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Typing :: Typed",
+]
+dependencies = ["langchain-typesafe>=0.0.1a3"]
+
+[project.optional-dependencies]
+crypto = ["cryptography>=50.0.1"]
+pii = ["presidio-analyzer>=2.2", "idna>=3.6,<4"]
+json = ["json-repair>=0.63.5"]
+regex = ["regex>=2024.11.6"]
+secrets = ["detect-secrets>=1.5"]
+tokens = ["tiktoken>=0.14.0,<1"]
+
+[project.urls]
+Homepage = "https://getjes.dev"
+Documentation = "https://docs.getjes.dev"
+Repository = "https://github.com/everafterlabs/jes"
+Issues = "https://github.com/everafterlabs/jes/issues"
+
+[project.scripts]
+jes = "jes.agents.cli:main"
+
+[dependency-groups]
+# The runnable lessons in examples/: uv run --group examples python -m examples.<lesson>.jev
+examples = [
+  "deepagents>=0.7.21,<0.8",
+  "langchain>=1.4.3,<2",
+  "langchain-ollama>=1.1,<2",
+  "langchain-openai>=1.6.7,<2",
+  "langchain-tavily>=0.2.18,<0.3",
+  "langgraph>=1.2.12,<2",
+  "ollama>=0.6.3,<0.7",
+  "openai>=3.22.1,<4",
+  "openai-agents>=0.22.3,<0.23",
+  "tavily-python>=0.8.4,<0.9",
+]
+dev = [
+  "cryptography>=50.0.1",
+  "detect-secrets>=1.5",
+  "hypothesis>=6.168.1",
+  "idna>=3.6,<4",
+  "presidio-analyzer>=2.2",
+  "pyright>=1.1.400",
+  "pytest>=8.3",
+  "pytest-asyncio>=0.25",
+  "pytest-cov>=6",
+  "regex>=2024.11.6",
+  "ruff>=0.11",
+  "tiktoken>=0.14.0,<1",
+]
+
+[tool.hatch.build.targets.sdist]
+only-include = [
+  "/src/jes",
+  "/README.md",
+  "/LICENSE",
+  "/pyproject.toml",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jes"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.format]
+# Markdown snippets are written by hand, and the Unicode tables are generated.
+exclude = ["*.md", "**/_ucd_data.py", "**/_confusables_data.py"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+known-first-party = ["jes"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/jes/text/_ucd_data.py" = ["E501", "RUF001", "RUF002", "RUF003"]
+"src/jes/text/_confusables_data.py" = ["E501", "RUF001", "RUF002", "RUF003"]
+
+[tool.pyright]
+include = ["src/jes"]
+pythonVersion = "3.11"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = "none"
+reportPrivateUsage = "none"
+
+[tool.pytest.ini_options]
+addopts = "--strict-config --strict-markers --cov=jes --cov-report=term-missing --cov-branch"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+
+[tool.coverage.run]
+branch = true
+source = ["jes"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+skip_covered = true

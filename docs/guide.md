@@ -1,0 +1,251 @@
+# Guide
+
+jes checks text before it reaches a model and before a tool result or reply is trusted. A check returns a probability. If that probability is over your threshold, `onward` is a refusal such as `Blocked: injection.` Send `onward` next, including when the check allows it.
+
+There are two ways to run those checks.
+
+- **Agents.** Claude Code, Codex, Hermes, OpenCode, OpenClaw, and Pi call `uvx jes` from a hook or plugin. You do not import the library.
+- **Applications.** Your Python code constructs a `Guard` and calls it around the model and tools.
+
+Patterns for the library API are in [cookbook.md](cookbook.md). Recipes are at [docs.getjes.dev/recipes](https://docs.getjes.dev/recipes).
+
+## Install
+
+You need Python 3.11 or newer and [uv](https://docs.astral.sh/uv/). The agent hooks run `uvx`, which ships with uv, so they do not need a separate global `jes` install. The first `uvx jes` call downloads the package. Later calls use the cache.
+
+```bash
+uvx jes login
+```
+
+`jes login` asks for a TypeSafe API key and writes it to `~/.config/jes/.env` (mode `0600`, directory mode `0700`). The first login also writes `~/.config/jes/config.json`. A later login updates the key and does not replace that file. `XDG_CONFIG_HOME` replaces `~/.config` when it is set. The command does not install hooks.
+
+To embed jes in an application instead:
+
+```bash
+pip install jes
+```
+
+Optional extras:
+
+- `jes[pii]` adds Presidio for the `PERSON` entity and `idna` for host names in `restore_origins`. `PERSON` also needs a spaCy English model, such as `python -m spacy download en_core_web_sm`. The other pii entities are local patterns and need neither.
+- `jes[secrets]` detects API keys and similar tokens.
+- `jes[crypto]` encrypts a `Redactions` store.
+- `jes[tokens]` uses tiktoken for `token_limit`.
+- `jes[regex]` and `jes[json]` are for those policies.
+
+From a git checkout, use `uv run jes` after `uv sync --dev`. `uvx --from . jes` runs the checkout without installing it.
+
+## Configure the agent checks
+
+The API key is an environment variable. The first value wins: the process environment, then `~/.config/jes/.env`. A blank line in the file does not override a value that is already set. The hooks never read a `.env` file from the project the agent is working in, because that project could point jes at another server.
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `TYPESAFE_API_KEY` | unset | Required. The TypeSafe key for Jev. |
+
+Which guards run is `~/.config/jes/config.json`, not the environment. A hook with no config file exits 2 and tells you to run `jes login`. A library `Guard` does not read this file. You pass policies and the model to it yourself.
+
+`config.json` is an object with `guards` and an optional `model`, the Jev model id. `model` defaults to `jev-latest`. Pin a release such as `jev-1.13.0` once your thresholds are tuned. Each built-in policy is a key in `guards`. `"enabled": false` skips that guard. An unknown guard, an unknown field, or a wrong type is an error. `judge` is not in the file. A custom question stays in Python.
+
+The file `jes login` writes enables three guards and lists the others turned off, with their factory defaults filled in so you can see the fields:
+
+- `injection` and `indirect_injection`: `threshold` (default `0.5`)
+- `hazards`: `threshold`. Omit `categories` to check every S1–S14, or set a list such as `["S1", "S2"]`
+- `toxicity`: `threshold`. Omit `labels` for every toxicity label, or set a list of labels
+- `topics`: `threshold` and `deny`, the topics to block. `deny` is required when the guard is enabled
+- `invisible_text`: `mode` (`targeted` or `all`) and `block`
+- `allowed_tools`: `names`, the tool names that may run. Required and non-empty when enabled
+- `tool_safety`: `threshold`. Judges the tool name and arguments against the user's request. `0.5` is the unset starting value, not a measured recommendation. Required when the guard is enabled
+- `canary`: `token`, the marker that must not appear. Required when enabled
+- `regex`: `patterns`, `action` (`block` or `redact`), `match` (`search` or `fullmatch`), `require`, `fold`, `timeout_ms`
+- `substrings`: `terms`, `action` (`block` or `redact`), `whole_words`, `fold`
+- `token_limit`: `limit`, `encoding` (default `cl100k_base`), `mode` (`block` or `truncate`)
+- `pii`: `entities`, `input_mode` (`redact`, `mask`, or `block`), `untrusted_mode` (`mask`, `redact`, or `block`), `output_mode` (`flag`, `redact`, or `block`), `tool_call_mode` (`block` or `flag`, for a tool call that carries personal data), `restore`. Without `entities`, a hook checks email, phone, credit card, US SSN, IBAN, and crypto addresses. `UUID`, `IP_ADDRESS`, `US_BANK_NUMBER`, and `PERSON` are opt-in
+- `secrets`: `redact` (`all`, `partial`, or `hmac`). `hmac` also requires `key`, base64 for at least 32 bytes
+
+`secrets` needs `jes[secrets]`. `regex` needs `jes[regex]`. `token_limit` needs `jes[tokens]`. `pii` with `PERSON` needs `jes[pii]` and a spaCy model. A missing extra fails the hook with that policy's error. The printed hooks run `uvx jes@<version>`, which installs no extras. To add them, change the command to `uvx --from 'jes[secrets,tokens]==<version>' jes <command>`. uvx does not install a spaCy model, so leave `PERSON` out of a hook. Per-policy `stages` and `name` stay at the factory defaults.
+
+The hooks keep two kinds of state under `~/.config/jes/sessions`, in files only you can read. One is the last allowed user prompt for each session, which later tool calls are judged against. The other is the parts of a reply that is still streaming, until it is complete. Parts of a reply that never finished are removed after a day.
+
+## Use jes with an agent
+
+Print a snippet, then save it where that agent loads hooks or plugins. Each snippet calls `uvx jes@<version> ...`, pinned to the jes release that printed it, so uv must be on `PATH` when the agent runs. After you upgrade jes, print the snippets again.
+
+```bash
+uvx jes claude-settings
+uvx jes codex-settings
+uvx jes hermes-settings
+uvx jes opencode-settings
+uvx jes openclaw-settings
+uvx jes pi-settings
+uvx jes runner-settings
+```
+
+The OpenCode, OpenClaw, and Pi plugins import `./jes-runner.ts`. Save the runner beside the plugin. `jes runner-settings` prints that file. The runner calls `uvx jes@<version> hook` and waits up to 60 seconds. A check that times out, crashes, or prints anything but a decision blocks with `Blocked: jes did not answer.`
+
+A blocked tool call is refused before the tool runs. A blocked tool result is replaced only when that host applies the hook's output. A shell command or file write that already ran is not undone.
+
+### Claude Code
+
+Merge the `hooks` object from `jes claude-settings` into `~/.claude/settings.json`.
+
+| Event | What jes does |
+| --- | --- |
+| `UserPromptSubmit` | Checks the user prompt. A block returns `decision: block`. |
+| `PreToolUse` | Checks the tool call before it runs. A block denies the call. |
+| `PostToolUse` | Checks the tool result after the tool has run. A block replaces the output the model reads, including stderr. It does not undo a shell command or a file write. That is what `PreToolUse` is for. |
+| `MessageDisplay` | Checks the reply once the message is final. A block changes the text on screen. The transcript, and what Claude sees on the next turn, keep the original reply. Exit code 2 does not block this event. |
+
+A `PostToolUse` or `MessageDisplay` process that dies before printing JSON fails open. jes catches judge errors and prints a refusal, so a Jev failure is not a silent allow.
+
+### Codex
+
+Copy the `hooks` object from `jes codex-settings` into `~/.codex/hooks.json`. Codex ignores a hook until you trust its exact text with `/hooks`.
+
+| Event | What jes does |
+| --- | --- |
+| `UserPromptSubmit` | Checks the user prompt. |
+| `PreToolUse` | Checks the tool call before it runs. |
+| `PostToolUse` | Replaces the model-facing result with the refusal. It does not undo the command. Codex does not apply `updatedToolOutput`. |
+| `Stop` | Checks `last_assistant_message` and continues the turn with the refusal. It does not change text already on screen. A second Stop with `stop_hook_active` is skipped so a refusal does not loop. |
+
+### Hermes
+
+Copy the `hooks` map from `jes hermes-settings` into `~/.hermes/config.yaml`. Trust the hook when Hermes asks.
+
+| Event | What jes does |
+| --- | --- |
+| `pre_tool_call` | Prints `action: block` and exits 2. `fail_closed: true` is set so a crashed hook does not allow the call. |
+| `pre_llm_call` | A blocked user message is injected as `context`. Hermes does not reject the user message. |
+
+Hermes shell hooks cannot replace a tool result or the assistant reply. Hermes drops the replacement from its transform events, so the printed config does not register them, and `jes hermes-hook` allows them without a check.
+
+### OpenCode
+
+Save both files in the plugin directory. Global plugins live in `~/.config/opencode/plugins/`. Project plugins live in `.opencode/plugins/`.
+
+```bash
+mkdir -p ~/.config/opencode/plugins
+uvx jes opencode-settings > ~/.config/opencode/plugins/opencode-plugin.ts
+uvx jes runner-settings > ~/.config/opencode/plugins/jes-runner.ts
+```
+
+OpenCode loads TypeScript files in that directory. The plugin exports `JesGuard`.
+
+| Hook | What jes does |
+| --- | --- |
+| `chat.message` | Checks the user prompt. A block throws the refusal. |
+| `tool.execute.before` | Checks the tool call. A block throws the refusal before the tool runs. |
+| `tool.execute.after` | Checks the tool result. A block sets `output.output` to the refusal. |
+
+OpenCode has no display-only reply hook, so the plugin does not rewrite the assistant reply.
+
+### OpenClaw
+
+Save `openclaw-plugin.ts` and `jes-runner.ts` in one directory. The plugin's default export is `register`. Link that directory the way OpenClaw loads a local plugin (`openclaw plugins install --link`), then enable it. Restart the gateway after you change plugin code.
+
+`before_agent_run` is a conversation hook. On a plugin that is not bundled with OpenClaw, set `plugins.entries.<name>.hooks.allowConversationAccess` to `true` or that hook does not run. See the OpenClaw plugin hook docs for the current enablement rules.
+
+| Hook | What jes does |
+| --- | --- |
+| `before_agent_run` | Checks the user prompt. A block returns `outcome: "block"` with the refusal as `reason` and `message`. |
+| `before_tool_call` | Checks the tool call. A block returns `block: true` and `blockReason`. |
+| `tool_result_persist` | Checks the tool result. A block returns `content` set to the refusal. |
+| `message_sending` | Checks the reply that is about to be delivered. A block returns `content` set to the refusal. |
+
+### Pi
+
+Pi loads `~/.pi/agent/extensions/*.ts` and `~/.pi/agent/extensions/*/index.ts`. Put the extension in a subdirectory so Pi loads `index.ts` and does not treat the runner as a second extension. Project-local extensions use `.pi/extensions/` the same way.
+
+```bash
+mkdir -p ~/.pi/agent/extensions/jes
+uvx jes pi-settings > ~/.pi/agent/extensions/jes/index.ts
+uvx jes runner-settings > ~/.pi/agent/extensions/jes/jes-runner.ts
+```
+
+Reload with `/reload`.
+
+| Hook | What jes does |
+| --- | --- |
+| `before_agent_start` | Checks the user prompt. A block injects the refusal as a message. Pi does not erase the original prompt. |
+| `tool_call` | Checks the tool call. A block returns `block: true` and `reason`. |
+| `tool_result` | Checks the tool result. A block replaces `content` with the refusal. Array content becomes a single text block. |
+
+## Use jes from Python
+
+```python
+from jes import Guard
+from jes.policies import injection
+
+guard = Guard([injection(threshold=0.5)], model="jev-latest")
+
+incoming = guard.check_input(user_text)
+if not incoming.ok:
+    return incoming.onward
+
+# call the LLM with incoming.onward
+outgoing = guard.check_output(llm_reply, prompt=incoming)
+return outgoing.onward
+```
+
+`result.ok` is true when the check allowed the text and finished every judgment. `result.onward` is the text to send next. A result also has `decision` (`"allow"` or `"block"`), `complete`, `original` (the checked text), `sanitized` (what the judges saw), `findings`, `scores`, `usage`, `duration_ms`, and `redactions`, the conversation's store.
+
+`Guard` takes these options:
+
+- `limits=Limits(...)` caps sizes and work. See the [limits table](design.md#10-limits).
+- `deadline_s=` limits each check, 30 seconds by default.
+- `on_backend_error=` is `"raise"` (the default), `"block"`, or `"allow"`. With `"block"` or `"allow"` the result is incomplete, so `ok` is false either way.
+- `fail_fast=True` skips judgments once a transform has blocked.
+
+A `Guard` sends a check's requests on a thread pool. Close it, or use it as a context manager, to stop the threads.
+
+| Method | When | Required | Optional |
+| --- | --- | --- | --- |
+| `check_input(text)` | User text, before the LLM. | `text` | `redactions=`, `history=` |
+| `check_untrusted(text, question=)` | A retrieved page or file, before it enters the prompt. | `text` | `question=`, `redactions=` |
+| `check_tool_call(name, arguments, prompt=)` | A tool call, before it runs. | `name`, `arguments`, `prompt=` | `redactions=` |
+| `check_tool_result(text, name=, prompt=)` | What the tool returned. | `text`, `name=` | `prompt=`, `redactions=` |
+| `check_output(text, prompt=)` | The LLM reply, before you show it. | `text`, `prompt=` | `sources=`, `history=`, `redactions=` |
+
+`prompt=` and `question=` take the `check_input` result. A plain string also works.
+
+`prompt=` is required on `check_tool_call` and `check_output` because those checks judge the text against what the user asked. `tool_safety` asks whether the call "goes beyond what the user asked": `delete_file("/data/reports")` is fine after "clean up old reports" and a block after "summarize this PDF". Without the prompt, the judge can't tell those apart. Passing the `check_input` result also carries the conversation's `Redactions` store, so PII hidden on the way in lines up with later checks and you don't need `redactions=`. `injection`, `secrets`, `pii` and `allowed_tools` look only at the tool name and arguments. `model="jev-1.13.0"` pins a Jev release. The client is LangChain's [TypeSafe classifier](https://docs.langchain.com/oss/python/integrations/providers/typesafe). Set `TYPESAFE_API_KEY` in the environment. A library `Guard` does not call `jes login` for you. Each lesson in examples/ has a `jev.py` on hosted Jev and a `local.py` on `tev1` via Ollama.
+
+Pass any of these to `Guard`. Judgment policies take `threshold=`.
+
+- `injection` — someone trying to override the model's instructions
+- `indirect_injection` — those instructions hidden in retrieved text or a tool result
+- `hazards` — the S1–S14 hazard list
+- `toxicity`
+- `topics` — a list of topics you name
+- `pii` — hides personal data on the way in and restores it in the reply (`jes[pii]`)
+- `secrets` — API keys and similar tokens (`jes[secrets]`)
+- `invisible_text` — hidden and lookalike characters
+- `regex`, `substrings`, `token_limit`
+- `allowed_tools` — tool names you permit
+- `canary` — a marker that must not appear in the reply
+- `judge` — a question you write
+
+`AsyncGuard` is the async twin of `Guard`. Tests should pass `jes.testing.FakeBackend` instead of calling Jev.
+
+## Develop jes
+
+```bash
+uv sync --dev
+uv run ruff check .
+uv run ruff format --check .
+uv run pyright
+uv run pytest
+```
+
+Plugin tests need Node 22:
+
+```bash
+node --experimental-strip-types --test tests/plugins/*.test.ts
+```
+
+CI runs ruff, `ruff format --check`, pyright, and pytest on Python 3.11 through 3.14, and runs the plugin tests on Node 22. CI must not download model weights or call a live provider. Use `FakeBackend` and synthetic text. Fixtures must not contain hazardous content, secrets, or real personal data.
+
+The library surface is `src/jes`. `guard.py` holds `Guard` and `AsyncGuard`, which send requests. The check itself is the I/O-free pipeline in `src/jes/engine`. Policies live in `src/jes/policies`, and the backend protocol and the TypeSafe backend in `src/jes/backend.py`. The `jes` command is `src/jes/agents`. Each agent's hook protocol is an adapter in `src/jes/agents/adapters.py`, and the TypeScript plugins are in `src/jes/agents/data/`. [design.md](design.md) explains how the parts fit.
+
+Public APIs stay typed under strict pyright. A change to a name in a module's `__all__` also needs an update in the API reference, which lives in the separate `jes-docs` repository. The site build pulls `docs/cookbook.md`, `docs/design.md`, `CHANGELOG.md`, and `examples/*.py` from this repo.
