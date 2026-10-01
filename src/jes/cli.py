@@ -10,7 +10,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Protocol
 
-from jes import Guard, claude, codex, hermes
+from jes import Guard, __version__, claude, codex, hermes
 from jes._env import load_config, user_env_path, write_config
 from jes.config import config_path, write_default_config
 from jes.errors import PolicyError
@@ -35,6 +35,7 @@ _SETTINGS = {
     "pi-settings": "pi-extension.ts",
     "runner-settings": "jes-runner.ts",
 }
+_VERSION_PLACEHOLDER = "__JES_VERSION__"
 
 
 class _Adapter(Protocol):
@@ -71,7 +72,9 @@ def main(argv: Sequence[str] | None = None, *, model: ModelSpec | None = None) -
         return _login()
     settings = _SETTINGS.get(command)
     if settings is not None:
-        sys.stdout.write(data_text(settings).rstrip("\n") + "\n")
+        # Pin the hooks to this release, so a new upload to PyPI never runs unannounced.
+        text = data_text(settings).replace(_VERSION_PLACEHOLDER, __version__)
+        sys.stdout.write(text.rstrip("\n") + "\n")
         return 0
     session_dir = Path(str(args.session_dir)) if args.session_dir else default_session_dir()
     sessions = SessionStore(session_dir)
@@ -163,4 +166,3 @@ def _login() -> int:
 def _write_json(payload: Mapping[str, object]) -> None:
     sys.stdout.write(json.dumps(payload, ensure_ascii=False, sort_keys=True))
     sys.stdout.write("\n")
-

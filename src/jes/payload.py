@@ -74,14 +74,21 @@ def tool_input(value: object) -> str:
         raise ConfigError("invalid arguments") from error
 
 
-_TEXT_FIELDS = ("stdout", "text", "content", "output")
+_TEXT_FIELDS = ("text", "content", "output")
 
 
 def tool_text(response: object) -> str:
+    """The text a tool result shows the model. A shell result is its stdout plus its stderr."""
+
     if isinstance(response, str):
         return response
     parsed = _as_dict(response)
     if parsed is not None:
+        stdout = parsed.get("stdout")
+        if isinstance(stdout, str):
+            stderr = parsed.get("stderr")
+            streams = (stdout, stderr if isinstance(stderr, str) else "")
+            return "\n".join(stream for stream in streams if stream)
         for key in _TEXT_FIELDS:
             value = parsed.get(key)
             if isinstance(value, str):

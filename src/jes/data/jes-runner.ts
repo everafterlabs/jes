@@ -1,4 +1,5 @@
-// Calls `uvx jes hook` on stdin. uvx ships with uv, so there is no separate jes install.
+// Calls `uvx jes@__JES_VERSION__ hook` on stdin. uvx ships with uv, so there is no separate jes install.
+// `jes runner-settings` prints this file with the version filled in. Print it again after upgrading jes.
 import { spawnSync } from "node:child_process";
 
 export type JesDecision = { ok: boolean; onward: string; decision: string };
@@ -6,7 +7,7 @@ export type JesDecision = { ok: boolean; onward: string; decision: string };
 export type JesRunner = (body: Record<string, unknown>) => JesDecision;
 
 export function spawnJes(body: Record<string, unknown>): JesDecision {
-  const run = spawnSync("uvx", ["jes", "hook"], {
+  const run = spawnSync("uvx", ["jes@__JES_VERSION__", "hook"], {
     input: JSON.stringify(body),
     encoding: "utf8",
   });

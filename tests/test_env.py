@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import stat
+import sys
 from pathlib import Path
 
-from pytest import MonkeyPatch
+from pytest import CaptureFixture, MonkeyPatch
 
-from jes._env import apply_env_file, load_config, load_project_env
+from jes._env import apply_env_file, load_config, load_project_env, write_config
 from jes.cli import main
-from jes.config import default_document
+from jes.config import default_document, write_default_config
+from jes.hook import SessionStore
+from jes.questions import YesNoAnswer
+from jes.testing import FakeBackend
 
 
 def _jes_root(path: Path) -> Path:
@@ -76,48 +81,85 @@ def test_load_project_env_ignores_other_projects_and_missing_file(
     assert os.environ.get("TYPESAFE_API_KEY") is None
 
 
-def test_config_lookup_order(tmp_path: Path) -> None:
-    root = tmp_path / "repo"
-    nested = root / "pkg"
-    nested.mkdir(parents=True)
-    (root / ".git").mkdir()
-    (root / ".env").write_text(
-        "TYPESAFE_API_KEY=from-dotenv\nEXTRA=from-dotenv\n",
+def _hostile_repo(path: Path) -> Path:
+    """A project whose dotenv files try to redirect jes to another server."""
+
+    path.mkdir()
+    (path / ".git").mkdir()
+    (path / ".env").write_text(
+        "TYPESAFE_API_KEY=from-repo\nTYPESAFE_BASE_URL=https://attacker.example\n",
         encoding="utf-8",
     )
-    (root / ".env.local").write_text(
-        "TYPESAFE_API_KEY=from-local\nREGION=from-local\n",
-        encoding="utf-8",
-    )
+    (path / ".env.local").write_text("TYPESAFE_API_KEY=from-local\n", encoding="utf-8")
+    return path
+
+
+def test_load_config_reads_only_the_user_env(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.chdir(_hostile_repo(tmp_path / "repo"))
     user = tmp_path / "user.env"
-    user.write_text(
-        "TYPESAFE_API_KEY=from-user\nEXTRA=from-user\nREGION=from-user\n",
-        encoding="utf-8",
-    )
+    user.write_text("TYPESAFE_API_KEY=from-user\nEXTRA=from-user\n", encoding="utf-8")
 
-    local: dict[str, str] = {}
-    load_config(nested, environ=local, user_env=user)
-    assert local["TYPESAFE_API_KEY"] == "from-local"
-    assert local["REGION"] == "from-local"
-    assert local["EXTRA"] == "from-dotenv"
+    found: dict[str, str] = {}
+    load_config(environ=found, user_env=user)
+    assert found == {"TYPESAFE_API_KEY": "from-user", "EXTRA": "from-user"}
 
-    present = {"TYPESAFE_API_KEY": "from-env", "EXTRA": "from-env"}
-    load_config(root, environ=present, user_env=user)
-    assert present["TYPESAFE_API_KEY"] == "from-env"
-    assert present["EXTRA"] == "from-env"
-    assert present["REGION"] == "from-local"
+    present = {"TYPESAFE_API_KEY": "from-env"}
+    load_config(environ=present, user_env=user)
+    assert present == {"TYPESAFE_API_KEY": "from-env", "EXTRA": "from-user"}
 
-    (root / ".env.local").unlink()
-    dotenv: dict[str, str] = {}
-    load_config(root, environ=dotenv, user_env=user)
-    assert dotenv["TYPESAFE_API_KEY"] == "from-dotenv"
-    assert dotenv["EXTRA"] == "from-dotenv"
-    assert dotenv["REGION"] == "from-user"
+    missing: dict[str, str] = {}
+    load_config(environ=missing, user_env=tmp_path / "absent.env")
+    assert missing == {}
 
-    (root / ".env").unlink()
-    fallback: dict[str, str] = {}
-    load_config(root, environ=fallback, user_env=user)
-    assert fallback["TYPESAFE_API_KEY"] == "from-user"
+
+def test_hook_ignores_dotenv_files_in_the_project(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+    capsys: CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(_hostile_repo(tmp_path / "repo"))
+    for name in ("TYPESAFE_API_KEY", "TYPESAFE_BASE_URL"):
+        # setenv then delenv, so the test restores "unset" even if the hook sets it.
+        monkeypatch.setenv(name, "placeholder")
+        monkeypatch.delenv(name)
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"stage": "input", "text": "hi"})))
+    model = FakeBackend(default_answer=YesNoAnswer(0.0, "probability"), max_units=1_000_000)
+
+    assert main(["hook", "--session-dir", str(tmp_path / "sessions")], model=model) == 0
+    assert json.loads(capsys.readouterr().out)["ok"] is True
+    assert "TYPESAFE_API_KEY" not in os.environ
+    assert "TYPESAFE_BASE_URL" not in os.environ
+
+
+def test_private_files_are_0600_from_creation(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    # With chmod disabled and no umask, only the creation mode can keep these files private.
+    monkeypatch.setattr(os, "chmod", lambda *_args, **_kwargs: None)
+    previous = os.umask(0)
+    try:
+        write_config(tmp_path / "jes" / ".env", {"TYPESAFE_API_KEY": "key"})
+        assert write_default_config(tmp_path / "jes" / "config.json")
+        SessionStore(tmp_path / "sessions").put("sess-1", "prompt")
+    finally:
+        os.umask(previous)
+    for path in (
+        tmp_path / "jes" / ".env",
+        tmp_path / "jes" / "config.json",
+        tmp_path / "sessions" / "prompts" / "sess-1",
+    ):
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600, path
+    for directory in (tmp_path / "jes", tmp_path / "sessions", tmp_path / "sessions" / "prompts"):
+        assert stat.S_IMODE(directory.stat().st_mode) == 0o700, directory
+    assert sorted(item.name for item in (tmp_path / "jes").iterdir()) == [".env", "config.json"]
+
+
+def test_writes_leave_existing_directories_alone(tmp_path: Path) -> None:
+    shared = tmp_path / "shared"
+    shared.mkdir()
+    shared.chmod(0o755)
+    write_config(shared / ".env", {"TYPESAFE_API_KEY": "key"})
+    assert write_default_config(shared / "config.json")
+    assert not write_default_config(shared / "config.json")
+    assert stat.S_IMODE(shared.stat().st_mode) == 0o755
 
 
 def test_login_writes_the_user_env(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
@@ -144,7 +186,7 @@ def test_login_writes_the_user_env(tmp_path: Path, monkeypatch: MonkeyPatch) -> 
     assert "JES_ALLOWED_TOOLS" not in text
     assert text.count("TYPESAFE_API_KEY=") == 1
     found: dict[str, str] = {}
-    load_config(tmp_path / "empty", environ=found, user_env=path)
+    load_config(environ=found, user_env=path)
     assert found["TYPESAFE_API_KEY"] == "next-key"
     assert found["OTHER"] == "keep"
     config = tmp_path / "jes" / "config.json"
@@ -157,4 +199,3 @@ def test_login_writes_the_user_env(tmp_path: Path, monkeypatch: MonkeyPatch) -> 
 
     monkeypatch.setattr("jes.cli.getpass.getpass", lambda _prompt="": "  ")
     assert main(["login"]) == 2
-

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Literal, cast
 
 from jes import Guard
+from jes._files import make_private_dirs, write_private
 from jes.config import load_policies
 from jes.errors import PolicyError
 from jes.judge import ModelSpec
@@ -114,12 +115,7 @@ class SessionStore:
         path = self._prompt_path(session_id)
         if path is None:
             return
-        self._mkdir(path.parent)
-        temporary = path.with_name(path.name + ".tmp")
-        temporary.write_text(prompt, encoding="utf-8")
-        os.chmod(temporary, 0o600)
-        os.replace(temporary, path)
-        os.chmod(path, 0o600)
+        write_private(path, prompt)
 
     def append_display(self, session_id: str, message_id: str, delta: str) -> None:
         path = self._display_path(session_id, message_id)
@@ -143,17 +139,11 @@ class SessionStore:
             return None
         return self.root / "display" / session_id / message_id
 
-    def _mkdir(self, path: Path) -> None:
-        path.mkdir(parents=True, exist_ok=True)
-        os.chmod(self.root, 0o700)
-        os.chmod(path, 0o700)
-
     def _write_display(self, path: Path, delta: str, *, consume: bool) -> str:
-        self._mkdir(path.parent)
+        make_private_dirs(path.parent)
         for child in path.parent.iterdir():
             if child.name != path.name and child.is_file():
                 child.unlink()
-        self._mkdir(path.parent)
         fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
         with os.fdopen(fd, "a+", encoding="utf-8") as handle:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX)

@@ -1,5 +1,5 @@
 # Hermes shell hooks. Copy the hooks map into ~/.hermes/config.yaml.
-# The hook command is `uvx jes hermes-hook`. uvx ships with uv, so there is
+# The hook command is `uvx jes@__JES_VERSION__ hermes-hook`. uvx ships with uv, so there is
 # no separate jes install. Trust the hook when Hermes asks.
 #
 # pre_tool_call: a failed check prints action block and exits 2.
@@ -15,9 +15,9 @@ limits:
 
 hooks:
   pre_llm_call:
-    - command: uvx jes hermes-hook
+    - command: uvx jes@__JES_VERSION__ hermes-hook
       timeout: 60
   pre_tool_call:
-    - command: uvx jes hermes-hook
+    - command: uvx jes@__JES_VERSION__ hermes-hook
       timeout: 60
       fail_closed: true

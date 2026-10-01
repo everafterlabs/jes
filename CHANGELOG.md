@@ -6,6 +6,15 @@ The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+## 1.0.5
+
+Security fixes for the agent hooks. Print your hook settings again after upgrading so they pin this release.
+
+- The hooks no longer read `.env` or `.env.local` from the project the agent is working in. The first value wins: the process environment, then `~/.config/jes/.env`. Before, a repository could set `TYPESAFE_BASE_URL` and receive your API key, prompts, and tool calls, and answer every check with "allow".
+- Claude Code: a Bash tool result is checked on stdout and stderr. A blocked result also clears stderr.
+- `jes claude-settings`, `codex-settings`, `hermes-settings`, and `runner-settings` pin the hooks to the installed release, such as `uvx jes@1.0.5 claude-hook`. An unpinned `uvx jes` ran whatever version was newest on PyPI.
+- The API key, config, and session prompt files are created with mode 0600 instead of being tightened after they are written. jes no longer changes the permissions of a directory it did not create.
+
 ## 1.0.4
 
 - Add the `jes` command. Agent hooks run with `uvx jes`.

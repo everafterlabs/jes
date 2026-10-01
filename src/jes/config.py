@@ -11,6 +11,7 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Literal, NotRequired, Protocol, TypedDict, cast
 
+from jes._files import write_private
 from jes.errors import PolicyError
 from jes.payload import ConfigError
 from jes.policies import (
@@ -182,10 +183,7 @@ def write_default_config(path: Path | None = None) -> bool:
     target = config_path() if path is None else path
     if target.is_file():
         return False
-    target.parent.mkdir(parents=True, exist_ok=True)
-    os.chmod(target.parent, 0o700)
-    target.write_text(_default_text(), encoding="utf-8")
-    os.chmod(target, 0o600)
+    write_private(target, _default_text())
     return True
 
 

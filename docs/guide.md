@@ -37,7 +37,7 @@ From a git checkout, use `uv run jes` after `uv sync --dev`. `uvx --from . jes` 
 
 ## Configure the agent checks
 
-The API key is an environment variable. The first value wins: the process environment, then `.env.local`, then `.env` at the git repository root, then `~/.config/jes/.env`. A blank line in a file does not override a value that is already set.
+The API key is an environment variable. The first value wins: the process environment, then `~/.config/jes/.env`. A blank line in the file does not override a value that is already set. The hooks never read a `.env` file from the project the agent is working in, because that project could point jes at another server.
 
 | Variable | Default | Effect |
 | --- | --- | --- |
@@ -69,7 +69,7 @@ The hook stores the last allowed user prompt for a session under `~/.config/jes/
 
 ## Use jes with an agent
 
-Print a snippet, then save it where that agent loads hooks or plugins. Each snippet calls `uvx jes ...`, so uv must be on `PATH` when the agent runs.
+Print a snippet, then save it where that agent loads hooks or plugins. Each snippet calls `uvx jes@<version> ...`, pinned to the jes release that printed it, so uv must be on `PATH` when the agent runs. After you upgrade jes, print the snippets again.
 
 ```bash
 uvx jes claude-settings
@@ -81,7 +81,7 @@ uvx jes pi-settings
 uvx jes runner-settings
 ```
 
-The OpenCode, OpenClaw, and Pi plugins import `./jes-runner.ts`. Save the runner beside the plugin. `jes runner-settings` prints that file. The runner calls `uvx jes hook`.
+The OpenCode, OpenClaw, and Pi plugins import `./jes-runner.ts`. Save the runner beside the plugin. `jes runner-settings` prints that file. The runner calls `uvx jes@<version> hook`.
 
 A blocked tool call is refused before the tool runs. A blocked tool result is replaced only when that host applies the hook's output. A shell command or file write that already ran is not undone.
 

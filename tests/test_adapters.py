@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+import jes
 from jes.cli import main
 from jes.errors import BackendError
 from jes.hook import SessionStore
@@ -679,10 +680,16 @@ def test_settings_snippets_name_the_hook_and_events(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.setattr(sys, "stdin", io.StringIO(""))
+    pinned = f"jes@{jes.__version__}"
     expected = {
-        "codex-settings": ("jes codex-hook", "Stop", "stop_hook_active", "trust its exact text"),
+        "codex-settings": (
+            f"{pinned} codex-hook",
+            "Stop",
+            "stop_hook_active",
+            "trust its exact text",
+        ),
         "hermes-settings": (
-            "jes hermes-hook",
+            f"{pinned} hermes-hook",
             "pre_tool_call",
             "pre_llm_call",
             "fail_closed",

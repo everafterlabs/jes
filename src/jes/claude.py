@@ -168,14 +168,17 @@ def _specific(event_name: str, fields: dict[str, object]) -> dict[str, object]:
 def _replaced_output(payload: Mapping[str, object], onward: str) -> object:
     response = payload.get("tool_response")
     parsed = _as_dict(response)
+    # The model reads stderr too, so a blocked shell result clears it along with stdout.
     if parsed is not None and isinstance(parsed.get("stdout"), str):
         updated = dict(parsed)
         updated["stdout"] = onward
+        if "stderr" in updated:
+            updated["stderr"] = ""
         return updated
     if payload.get("tool_name") == "Bash":
         updated = dict(parsed or {})
         updated["stdout"] = onward
-        updated.setdefault("stderr", "")
+        updated["stderr"] = ""
         updated.setdefault("interrupted", False)
         updated.setdefault("isImage", False)
         return updated
