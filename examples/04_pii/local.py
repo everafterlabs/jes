@@ -42,7 +42,9 @@ def main() -> tuple[InputResult, ScanResult, InputResult, bytes]:
     # pii is local, so this guard needs no decision model.
     guard = Guard([pii()])
 
-    incoming = guard.check_input("Please confirm my email address: ada@example.com", redactions=store)
+    incoming = guard.check_input(
+        "Please confirm my email address: ada@example.com", redactions=store
+    )
     # The model sees incoming.onward, never the address.
     reply = chat_model().invoke([("system", SYSTEM), ("user", incoming.onward)]).text
     # The user sees outgoing.onward, with the address restored.

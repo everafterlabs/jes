@@ -60,5 +60,3 @@ tool that returns a poisoned page.
   0.5 for `tev1`. Tune them on your own traffic, then pin the model (`jev-1.13.0`).
 - `_common.py` only prints results and loads `.env`. `_middleware.py` is the
   LangChain middleware that lessons 13 and 15 share.
-- Run every lesson live:
-  `uv run --frozen --group examples pytest -m live tests/test_examples_live.py --no-cov`.

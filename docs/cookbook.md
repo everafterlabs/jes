@@ -10,7 +10,6 @@ The runnable code is a 15-lesson course in [examples/](../examples/README.md),
 read in order. Every lesson is a folder with two files: `jev.py` judges with
 hosted Jev and uses OpenAI and Tavily, and `local.py` judges with `tev1` and
 chats with qwen3, both on Ollama. Keys come from the environment or `.env`.
-The tests swap in fixed scores (`jes.testing.FakeBackend`) and scripted models.
 
 ```bash
 uv run python -m examples.01_first_check.jev     # hosted Jev
