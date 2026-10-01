@@ -48,7 +48,7 @@ tool that returns a poisoned page.
 
 | # | Lesson | You learn |
 | --- | --- | --- |
-| 11 | [jev](11_openai_sdk/jev.py) · [local](11_openai_sdk/local.py) | A hand-written tool loop with every check in plain sight |
+| 11 | [jev](11_openai_sdk/jev.py) · [local](11_openai_sdk/local.py) · [openrouter](11_openai_sdk/openrouter.py) | A hand-written tool loop with every check in plain sight |
 | 12 | [jev](12_openai_agents_sdk/jev.py) · [local](12_openai_agents_sdk/local.py) | jes as OpenAI Agents SDK guardrails |
 | 13 | [jev](13_langchain_agent/jev.py) · [local](13_langchain_agent/local.py) | One middleware guards a LangChain agent |
 | 14 | [jev](14_langgraph/jev.py) · [local](14_langgraph/local.py) | The same checks as LangGraph nodes |
@@ -58,5 +58,7 @@ tool that returns a poisoned page.
 
 - Thresholds are application choices, not library defaults: 0.72 for Jev,
   0.5 for `tev1`. Tune them on your own traffic, then pin the model (`jev-1.13.0`).
+- Lesson 11 also has `openrouter.py`: Jev still decides, and the replies come
+  from any model on OpenRouter through the same OpenAI client.
 - `_common.py` only prints results and loads `.env`. `_middleware.py` is the
   LangChain middleware that lessons 13 and 15 share.
