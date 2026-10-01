@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import ast
+import json
 import sys
-import time
 
 import pytest
 
@@ -123,15 +123,31 @@ def test_json_check_finds_the_first_json_value() -> None:
     assert recipes.json_check().apply('"just a string"', OUTPUT).findings
 
 
-def test_json_check_survives_hostile_input() -> None:
-    # 1.x re-scanned from every bracket, quadratic on unclosed brackets.
-    started = time.perf_counter()
+def test_json_check_survives_hostile_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    # 1.x re-scanned from every bracket, quadratic on unclosed brackets. Counting
+    # attempts, not seconds, holds on every Python: 3.14 parses far deeper per attempt.
+    starts: list[int] = []
+    raw_decode = json.JSONDecoder.raw_decode
+
+    def counted(self: json.JSONDecoder, text: str, start: int = 0) -> tuple[object, int]:
+        starts.append(start)
+        return raw_decode(self, text, start)
+
+    monkeypatch.setattr(json.JSONDecoder, "raw_decode", counted)
     assert recipes.json_check().apply("[" * 200_000, OUTPUT).findings
-    # Nesting past the recursion limit is not JSON jes can read, and must not crash the check.
-    assert recipes.json_check().apply("[" * 100_000 + "]" * 100_000, OUTPUT).findings
-    assert time.perf_counter() - started < 2
+    assert len(starts) == 100
+    # Deep nesting must not crash the check. Python 3.14 parses this, and older
+    # versions stop at their recursion limit.
+    recipes.json_check().apply("[" * 100_000 + "]" * 100_000, OUTPUT)
     nested = recipes.json_check(2).apply("[" * 500 + "]" * 500, OUTPUT)
     assert nested.findings[0].spans == (Span(0, 1_000),)
+
+    # JSON nested deeper than the parser can go counts as no JSON, so the check blocks.
+    def too_deep(*args: object) -> tuple[object, int]:
+        raise RecursionError
+
+    monkeypatch.setattr(json.JSONDecoder, "raw_decode", too_deep)
+    assert recipes.json_check().apply("[[]]", OUTPUT).findings
 
 
 class _Repair:
