@@ -30,7 +30,7 @@ uv run python -m examples.01_first_check.local
 
 | # | Lesson | You learn |
 | --- | --- | --- |
-| 01 | [jev](01_first_check/jev.py) · [local](01_first_check/local.py) | A `Guard`, one policy, a threshold, `ok` and `onward` |
+| 01 | [jev](01_first_check/jev.py) · [local](01_first_check/local.py) · [openrouter](01_first_check/openrouter.py) | A `Guard`, one policy, a threshold, `ok` and `onward` |
 | 02 | [jev](02_model_call/jev.py) · [local](02_model_call/local.py) | Three places to check: the input, a retrieved page, the model's reply |
 | 03 | [jev](03_tool_calls/jev.py) · [local](03_tool_calls/local.py) | Allow only some tools, then check what a tool returns |
 | 04 | [jev](04_pii/jev.py) · [local](04_pii/local.py) | Hide PII from the model and restore it in the reply |
@@ -58,7 +58,8 @@ tool that returns a poisoned page.
 
 - Thresholds are application choices, not library defaults: 0.72 for Jev,
   0.5 for `tev1`. Tune them on your own traffic, then pin the model (`jev-1.13.0`).
-- Lesson 11 also has `openrouter.py`: Jev still decides, and the replies come
-  from any model on OpenRouter through the same OpenAI client.
+- Lessons 01 and 11 also have `openrouter.py`: Jev decides through OpenRouter,
+  and in lesson 11 any OpenRouter chat model writes the replies. One
+  `OPENROUTER_API_KEY` covers both.
 - `_common.py` only prints results and loads `.env`. `_middleware.py` is the
   LangChain middleware that lessons 13 and 15 share.

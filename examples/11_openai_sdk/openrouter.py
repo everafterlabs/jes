@@ -3,11 +3,11 @@
 The loop is written out by hand, so every check is in plain sight: the user's
 text, each tool call before it runs, each search result, and the final reply.
 
-Jev still decides. OpenRouter serves the Responses API at /api/v1, so the same
-OpenAI client reaches any model it routes to.
+OpenRouter serves both models: Jev decides, and the Responses API at /api/v1
+lets the same OpenAI client reach any chat model it routes to.
 
 Run:   uv run --group examples python -m examples.11_openai_sdk.openrouter
-Needs: TYPESAFE_API_KEY, OPENROUTER_API_KEY, TAVILY_API_KEY
+Needs: OPENROUTER_API_KEY, TAVILY_API_KEY
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ import os
 from collections.abc import Callable
 from typing import Any
 
+from langchain_typesafe import TypeSafeClassifier
 from openai import OpenAI
 from tavily import TavilyClient
 
@@ -29,6 +30,15 @@ THRESHOLD = 0.72
 
 # Any model id from openrouter.ai/models.
 CHAT_ARGS: dict[str, Any] = {"model": "openai/gpt-5.4-mini"}
+
+
+def decision_model() -> TypeSafeClassifier:
+    return TypeSafeClassifier(
+        model=MODEL,
+        base_url="https://openrouter.ai/api",
+        api_key=os.environ["OPENROUTER_API_KEY"],
+        timeout=60,
+    )
 
 
 def chat_client() -> OpenAI:
@@ -145,7 +155,7 @@ def main() -> None:
             indirect_injection(threshold=THRESHOLD),
             hazards(threshold=THRESHOLD),
         ],
-        model=MODEL,
+        model=decision_model(),
     )
     client = chat_client()
     for name, (question, web_search) in SCENARIOS.items():
@@ -153,5 +163,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    require_env("TYPESAFE_API_KEY", "OPENROUTER_API_KEY", "TAVILY_API_KEY")
+    require_env("OPENROUTER_API_KEY", "TAVILY_API_KEY")
     main()
