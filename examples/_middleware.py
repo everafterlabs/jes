@@ -21,7 +21,7 @@ from langchain.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.runtime import Runtime
 from langgraph.types import Command
 
-from examples._backend import Check
+from examples._common import Check
 from jes import Guard
 
 

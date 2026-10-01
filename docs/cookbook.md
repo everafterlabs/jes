@@ -6,16 +6,15 @@ quickstart. Recipes are listed in [docs/recipes.md](recipes.md).
 There is no measured default and no recommended backend. Every `threshold=`
 below is an application choice.
 
-The runnable code is a 17-lesson course in [examples/](../examples/README.md),
-read in order. Every lesson calls real services by default: Jev for judgments,
-and OpenAI, Tavily, or Ollama where the lesson has a model or a tool. Keys come
-from the environment or `.env`. Pass `--mock` to run offline with fixed scores
-(`jes.testing.FakeBackend`) and a scripted model. A mock score is one you set,
-not a judgment. Tests run the mock path only.
+The runnable code is a 15-lesson course in [examples/](../examples/README.md),
+read in order. Every lesson is a folder with two files: `jev.py` judges with
+hosted Jev and uses OpenAI and Tavily, and `local.py` judges with `tev1` and
+chats with qwen3, both on Ollama. Keys come from the environment or `.env`.
+The tests swap in fixed scores (`jes.testing.FakeBackend`) and scripted models.
 
 ```bash
-uv run python -m examples.01_first_check          # live Jev
-uv run python -m examples.01_first_check --mock   # offline
+uv run python -m examples.01_first_check.jev     # hosted Jev
+uv run python -m examples.01_first_check.local   # tev1 on Ollama
 ```
 
 jes restores plain text only. Escape a restored value before Markdown, HTML,
@@ -23,7 +22,7 @@ JSON, or a shell.
 
 ## 1. One check
 
-`examples/01_first_check.py` blocks when the score is above the threshold.
+`examples/01_first_check/jev.py` blocks when the score is above the threshold.
 
 ```python
 guard = Guard([injection(threshold=0.72)], model="jev-latest")
@@ -69,7 +68,7 @@ own traffic. Lessons 16 and 17 run on `tev1`.
 
 ## 3. The model call
 
-`examples/02_model_call.py` uses one guard. It allows an ordinary input, blocks an
+`examples/02_model_call/jev.py` uses one guard. It allows an ordinary input, blocks an
 untrusted instruction, and does not pass that blocked result onward. The output
 check uses `hazards` and blocks when `hazard.any` crosses the threshold. The
 finding is named `S1` because that category score also crosses. Other hazard
@@ -77,7 +76,7 @@ scores are the mock's default of zero.
 
 ## 4. Tool calls
 
-`examples/03_tool_calls.py` blocks a call whose name is not in `allowed_tools`.
+`examples/03_tool_calls/jev.py` blocks a call whose name is not in `allowed_tools`.
 Pass the argument object; jes serializes it. An allowed call keeps that
 string. The tool's response is checked with `check_tool_result(..., prompt=)`.
 Forward `onward` on every path, including when the check allows: that string is
@@ -87,71 +86,68 @@ user message says `Blocked:` plus the finding names. Pass each allowed
 out, so the reply is judged against the tool text. jes does not restore values
 into those arguments and does not decide that the application may run the tool.
 
-`examples/13_langchain_agent.py` puts those checks in a LangChain 1.4 agent:
+`examples/13_langchain_agent/jev.py` puts those checks in a LangChain 1.4 agent:
 `before_model` checks the user message, `wrap_tool_call` checks the call and
 the tool response, and `wrap_model_call` checks the finished reply.
-`examples/14_langgraph.py` is the same flow as an explicit LangGraph 1.2
+`examples/14_langgraph/jev.py` is the same flow as an explicit LangGraph 1.2
 `StateGraph` with a `ToolNode` and a retry policy on the network nodes. Both
-run gpt-5.4-mini with Tavily search live, and a scripted model with `--mock`.
-`examples/15_deep_agents.py` puts the same middleware on a Deep Agent and on
+run gpt-5.4-mini with Tavily search in `jev.py`, and qwen3 with an offline
+search in `local.py`.
+`examples/15_deep_agents/jev.py` puts the same middleware on a Deep Agent and on
 its `researcher` subagent, so the handoff and the subagent's tools are checked.
-`examples/17_langgraph_local.py` reuses lesson 14's graph fully local: qwen3 on Ollama for the model
-and `tev1` on Ollama for the judgments.
 
 ```bash
-uv run --group examples python -m examples.13_langchain_agent
-uv run --group examples python -m examples.14_langgraph
-uv run --group examples python -m examples.15_deep_agents
-ollama pull tev1 && uv run --group examples python -m examples.17_langgraph_local
+uv run --group examples python -m examples.13_langchain_agent.jev
+uv run --group examples python -m examples.14_langgraph.jev
+uv run --group examples python -m examples.15_deep_agents.jev
+uv run --group examples python -m examples.14_langgraph.local   # fully local
 ```
 
 Without LangChain, call the same checks around your own loop.
-`examples/11_openai_sdk.py` guards an OpenAI Responses API tool loop.
-`examples/12_openai_agents_sdk.py` uses jes as an OpenAI Agents SDK input and
-output guardrail and checks inside a function tool. `examples/16_ollama.py`
-uses the plain `ollama` client with `tev1`.
+`examples/11_openai_sdk/jev.py` guards an OpenAI Responses API tool loop.
+`examples/12_openai_agents_sdk/jev.py` uses jes as an OpenAI Agents SDK input and
+output guardrail and checks inside a function tool. Their `local.py` files
+point the same OpenAI clients at Ollama's `/v1` endpoint.
 
 ```bash
-uv run --group examples python -m examples.11_openai_sdk
-uv run --group examples python -m examples.12_openai_agents_sdk
-uv run --group examples python -m examples.16_ollama
+uv run --group examples python -m examples.11_openai_sdk.jev
+uv run --group examples python -m examples.12_openai_agents_sdk.jev
 ```
 
 ## 5. PII across one conversation
 
-`examples/04_pii.py` keeps one `Redactions` store. `sanitized` hides
+`examples/04_pii/jev.py` keeps one `Redactions` store. `sanitized` hides
 `ada@example.com`. The complete reply restores it into `text`. A second input
 of the same address reuses the placeholder. `dumps` / `loads` needs the same
 32-byte key, scope, and associated data (`jes[crypto]`).
 
 ## 6. Secrets and a canary
 
-`examples/05_secrets_canary.py` redacts an `sk-` token on input. On output,
+`examples/05_secrets_canary/jev.py` redacts an `sk-` token on input. On output,
 `canary("CANARY-TOKEN")` removes that marker from the backend projection and
 blocks, including when `fail_fast` is false.
 
 ## 7. Topics and toxicity
 
-`examples/06_topics_toxicity.py`. `topics(["medical advice"], threshold=0.70)`
+`examples/06_topics_toxicity/jev.py`. `topics(["medication dosage"], threshold=0.72)`
 always takes a threshold. A topic list never has a library default. The
-toxicity example blocks because the registered `insult` score is `0.9`. The
-sentence in the file is ordinary on purpose: the score is the mock's.
+toxicity example blocks an insult and allows an ordinary sentence.
 
 ## 8. Your own question
 
-`examples/07_custom_questions.py` uses `judge()` for a yes/no question, a choice
+`examples/07_custom_questions/jev.py` uses `judge()` for a yes/no question, a choice
 with `violating=["billing"]`, and a score with `violation_level=2`.
 
 ## 9. Recipes
 
-`examples/08_recipes.py` uses `sentiment` and `competitors`. `malicious_urls`
+`examples/08_recipes/jev.py` uses `sentiment` and `competitors`. `malicious_urls`
 judges each `http`/`https` URL as its own item. `factual_consistency` runs on
 the whole output and receives `sources`. The rest of the catalog is
 [docs/recipes.md](recipes.md).
 
 ## 10. Failure and limits
 
-`examples/10_failures.py`.
+`examples/10_failures/jev.py`.
 
 * `on_backend_error="raise"` raises `BackendError`.
 * `"block"` returns a block and `complete=False`.
@@ -160,4 +156,4 @@ the whole output and receives `sources`. The rest of the catalog is
 
 ## 11. Async
 
-`examples/09_async.py` runs the same input check on `AsyncGuard`.
+`examples/09_async/jev.py` runs the same input check on `AsyncGuard`.
