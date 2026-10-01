@@ -1,4 +1,8 @@
 .env
+.env.*
+!.env.example
+# Local browser profiles from automation; never commit.
+prof/
 .coverage
 .hypothesis/
 .pytest_cache/

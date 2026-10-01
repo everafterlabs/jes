@@ -1,19 +1,17 @@
-"""Offline cookbook examples stay aligned with docs/cookbook.md."""
+"""The lessons in examples/, run offline with mock=True.
+
+Agent lessons need the ``examples`` dependency group and are skipped without it.
+"""
 
 from __future__ import annotations
 
+import importlib
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
-from examples.async_check import main as async_main
-from examples.custom_questions import main as custom_main
-from examples.failures import main as failures_main
-from examples.model_call import main as model_call_main
-from examples.one_check import main as one_check
-from examples.pii_conversation import main as pii_main
-from examples.recipes import main as recipes_main
-from examples.secrets_canary import main as secrets_main
-from examples.tool_calls import main as tool_main
-from examples.topics_toxicity import main as topics_main
+import pytest
+
 from jes import Guard, Redactions
 from jes.policies import toxicity
 from jes.questions import YesNoAnswer
@@ -21,51 +19,72 @@ from jes.testing import FakeBackend
 
 ROOT = Path(__file__).parents[1]
 COOKBOOK = ROOT / "docs" / "cookbook.md"
-_OFFLINE = (
-    "one_check.py",
-    "model_call.py",
-    "tool_calls.py",
-    "langchain_agent.py",
-    "langgraph_agent.py",
-    "pii_conversation.py",
-    "secrets_canary.py",
-    "topics_toxicity.py",
-    "custom_questions.py",
-    "recipes.py",
-    "failures.py",
-    "async_check.py",
-)
+LESSONS = sorted(path.stem for path in (ROOT / "examples").glob("[0-9][0-9]_*.py"))
+# Agent lessons and the packages their --mock path imports.
+AGENT_LESSONS = {
+    "11_openai_sdk": ("openai",),
+    "12_openai_agents_sdk": ("agents",),
+    "13_langchain_agent": ("langchain", "langgraph"),
+    "14_langgraph": ("langchain", "langgraph"),
+    "15_deep_agents": ("deepagents",),
+    "16_ollama": (),
+    "17_langgraph_local": ("langchain", "langgraph"),
+}
 
 
-def test_cookbook_names_the_examples() -> None:
-    text = COOKBOOK.read_text(encoding="utf-8")
-    for name in _OFFLINE:
-        assert name in text
-    assert "live_typesafe.py" in text
-    assert "docs/recipes.md" in text
+def lesson(name: str) -> Callable[..., Any]:
+    """The ``main`` of examples/<name>.py."""
+
+    return importlib.import_module(f"examples.{name}").main
+
+
+def test_course_has_seventeen_lessons() -> None:
+    assert len(LESSONS) == 17
+    assert [name[:2] for name in LESSONS] == [f"{n:02d}" for n in range(1, 18)]
+
+
+def test_syllabus_and_cookbook_name_every_lesson() -> None:
+    syllabus = (ROOT / "examples" / "README.md").read_text(encoding="utf-8")
+    cookbook = COOKBOOK.read_text(encoding="utf-8")
+    for name in LESSONS:
+        assert f"{name}.py" in syllabus
+        assert f"{name}.py" in cookbook
+    assert "docs/recipes.md" in cookbook
+
+
+@pytest.mark.parametrize("name", sorted(AGENT_LESSONS))
+def test_agent_lesson_blocks_attacks_offline(name: str) -> None:
+    for module in AGENT_LESSONS[name]:
+        pytest.importorskip(module)
+    runs = lesson(name)(mock=True)
+    assert set(runs) == {"clean", "attack", "poisoned_tool"}
+    assert all(check.result.ok for check in runs["clean"].checks)
+    attack = runs["attack"].checks
+    assert attack and attack[0].stage.endswith("input") and not attack[0].result.ok
+    assert runs["attack"].ran == []
+    results = [c.result for c in runs["poisoned_tool"].checks if "tool_result" in c.stage]
+    assert any(not result.ok for result in results)
 
 
 def test_one_check_blocks() -> None:
-    result = one_check()
+    result = lesson("01_first_check")(mock=True)
     assert result.decision == "block"
     assert result.ok is False
     assert result.onward == "Blocked: injection."
 
 
 def test_model_call() -> None:
-    incoming, retrieved, outgoing = model_call_main()
+    incoming, retrieved, outgoing = lesson("02_model_call")(mock=True)
     assert incoming.ok
     assert incoming.onward == "Please summarize the notes."
     assert retrieved.decision == "block"
     assert retrieved.ok is False
     assert retrieved.onward == "Blocked: indirect_injection."
-    assert outgoing.decision == "block"
-    assert any(finding.label == "S1" for finding in outgoing.findings)
-    assert outgoing.onward == "Blocked: S1."
+    assert outgoing.ok
 
 
 def test_pii_round_trip() -> None:
-    incoming, outgoing, again, blob = pii_main()
+    incoming, outgoing, again, blob = lesson("04_pii")(mock=True)
     assert "ada@example.com" not in incoming.onward
     assert "ada@example.com" in outgoing.onward
     assert "ada@example.com" not in outgoing.sanitized
@@ -76,40 +95,41 @@ def test_pii_round_trip() -> None:
 
 
 def test_secrets_and_canary() -> None:
-    hidden, leaked = secrets_main()
+    hidden, leaked = lesson("05_secrets_canary")(mock=True)
     assert "sk-" not in hidden.onward
     assert hidden.ok
     assert leaked.decision == "block"
     assert leaked.onward == "Blocked: canary."
-    assert "CANARY-TOKEN" not in leaked.onward
+    assert "canary-5f1c9e7a2b84d360" not in leaked.onward
 
 
 def test_tool_calls() -> None:
-    refused, accepted, poisoned = tool_main()
+    refused, accepted, real, poisoned = lesson("03_tool_calls")(mock=True)
     assert refused.decision == "block"
     assert refused.text == '{"command":"ls"}'
     assert refused.onward == "Tool call blocked."
     assert accepted.ok
-    assert accepted.onward == '{"q":"notes"}'
+    assert accepted.onward == '{"query":"Python 3.13 release highlights"}'
+    assert real.ok
     assert poisoned.onward == "Tool result blocked."
 
 
 def test_topics_and_toxicity_block() -> None:
-    topic_result, toxic = topics_main()
+    topic_result, toxic = lesson("06_topics_toxicity")(mock=True)
     assert topic_result.decision == "block"
     assert toxic.decision == "block"
     assert any(finding.label == "insult" for finding in toxic.findings)
 
 
 def test_custom_questions_block() -> None:
-    refund, route, severity = custom_main()
+    refund, route, severity = lesson("07_custom_questions")(mock=True)
     assert refund.decision == "block"
     assert route.decision == "block"
     assert severity.decision == "block"
 
 
 def test_recipes() -> None:
-    hostile, redacted, linked, inconsistent = recipes_main()
+    hostile, redacted, linked, inconsistent = lesson("08_recipes")(mock=True)
     assert hostile.onward == "Blocked: sentiment."
     assert "Acme" not in redacted.onward
     assert linked.ok
@@ -117,7 +137,7 @@ def test_recipes() -> None:
 
 
 def test_failures_and_the_byte_cap() -> None:
-    raised, blocked, opened, limited = failures_main()
+    raised, blocked, opened, limited = lesson("10_failures")()
     assert raised == "raised"
     assert blocked.decision == "block"
     assert blocked.complete is False
@@ -132,7 +152,7 @@ def test_failures_and_the_byte_cap() -> None:
 
 
 def test_async_check_allows() -> None:
-    result = async_main()
+    result = lesson("09_async")(mock=True)
     assert result.ok
     assert result.onward == "Please summarize the notes."
 

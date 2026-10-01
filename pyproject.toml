@@ -46,6 +46,19 @@ Issues = "https://github.com/everafterlabs/jes/issues"
 jes = "jes.cli:main"
 
 [dependency-groups]
+# The runnable lessons in examples/. Live runs: uv run --frozen --group examples
+examples = [
+  "deepagents>=0.7.21,<0.8",
+  "langchain>=1.4.3,<2",
+  "langchain-ollama>=1.1,<2",
+  "langchain-openai>=1.6.7,<2",
+  "langchain-tavily>=0.2.18,<0.3",
+  "langgraph>=1.2.12,<2",
+  "ollama>=0.6.3,<0.7",
+  "openai>=3.22.1,<4",
+  "openai-agents>=0.22.3,<0.23",
+  "tavily-python>=0.8.4,<0.9",
+]
 dev = [
   "cryptography>=50.0.1",
   "detect-secrets>=1.5",
@@ -96,10 +109,11 @@ reportMissingTypeStubs = "none"
 reportPrivateUsage = "none"
 
 [tool.pytest.ini_options]
-addopts = "--strict-config --strict-markers --cov=jes --cov-report=term-missing --cov-branch"
+addopts = "-m \"not live\" --strict-config --strict-markers --cov=jes --cov-report=term-missing --cov-branch"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["src", "."]
+markers = ["live: calls real APIs (Jev, OpenAI, Tavily, Ollama); run with -m live"]
 
 [tool.coverage.run]
 branch = true
