@@ -175,9 +175,10 @@ def test_scores_include_passing_questions_and_threshold_changes_provenance() -> 
     assert score.provenance.threshold.source == "explicit"
     assert score.provenance.request_profile
     assert score.provenance.decision_profile
-    assert low.scores["p.violation"].provenance.threshold.fingerprint != high.scores[
-        "p.violation"
-    ].provenance.threshold.fingerprint
+    assert (
+        low.scores["p.violation"].provenance.threshold.fingerprint
+        != high.scores["p.violation"].provenance.threshold.fingerprint
+    )
 
 
 def test_redactions_repr_and_serialization_fail() -> None:

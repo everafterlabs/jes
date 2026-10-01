@@ -54,4 +54,3 @@ class DeadlineExceeded(BackendError):
 
     def __init__(self, backend: str, *, question_ids: Iterable[str] = ()) -> None:
         super().__init__(backend, "deadline_exceeded", question_ids=question_ids)
-

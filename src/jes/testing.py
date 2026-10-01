@@ -155,9 +155,7 @@ class FakeBackend:
             "prompt": state.prompt,
             "question": state.question,
             "sources": state.sources,
-            "history": [
-                {"role": message.role, "text": message.text} for message in state.history
-            ],
+            "history": [{"role": message.role, "text": message.text} for message in state.history],
         }
         if state.tool is not None:
             state_payload["tool"] = state.tool
@@ -376,9 +374,7 @@ class FakeSensitiveTransform:
             if index < 0:
                 break
             span = Span(index, index + len(self.marker))
-            edits.append(
-                _SensitiveEdit(span, self.entity, self.mode, self.action)
-            )
+            edits.append(_SensitiveEdit(span, self.entity, self.mode, self.action))
             findings.append(TransformFinding(self.entity, self.action, (span,)))
             start = span.end
         return _SensitiveOutcome(tuple(edits), tuple(findings))
@@ -419,6 +415,7 @@ def assert_semantic_parity(left: ScanResult, right: ScanResult) -> None:
     assert {key: (score.value, score.kind) for key, score in left.scores.items()} == {
         key: (score.value, score.kind) for key, score in right.scores.items()
     }
+
     def usage_key(item: Usage) -> tuple[object, ...]:
         return (
             item.backend,

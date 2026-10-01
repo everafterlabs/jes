@@ -69,8 +69,7 @@ def merge_scores(
             if previous is not None:
                 if (
                     previous.kind != score.kind
-                    or previous.provenance.decision_profile
-                    != score.provenance.decision_profile
+                    or previous.provenance.decision_profile != score.provenance.decision_profile
                 ):
                     raise BackendError(
                         score.provenance.backend,
@@ -81,4 +80,3 @@ def merge_scores(
                     continue
             merged[question_id] = score
     return merged
-

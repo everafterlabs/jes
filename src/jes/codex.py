@@ -125,5 +125,3 @@ def _assistant_text(payload: Mapping[str, object]) -> str | None:
     if isinstance(value, str) and value:
         return value
     return None
-
-

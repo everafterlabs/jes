@@ -265,9 +265,7 @@ def test_secrets_partial_hmac_and_uri_rejects() -> None:
     assert _FAKE_KEY not in partial.sanitized
     assert partial.sanitized.startswith("tok ")
     _reset_secrets_config()
-    hashed = Guard([secrets(redact="hmac", key=key)], model=backend).check_input(
-        f"tok {_FAKE_KEY}"
-    )
+    hashed = Guard([secrets(redact="hmac", key=key)], model=backend).check_input(f"tok {_FAKE_KEY}")
     assert _FAKE_KEY not in hashed.sanitized
     assert len(hashed.sanitized.split()[-1]) == 64
 

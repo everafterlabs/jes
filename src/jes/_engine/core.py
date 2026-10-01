@@ -528,8 +528,7 @@ class BaseGuard:
             next_state = replace(candidate, history=tuple(proposed))
             next_room = backend.headroom(next_state, questions)
             if next_room is not None and (
-                next_room < 64
-                or (baseline is not None and baseline - next_room > baseline // 2)
+                next_room < 64 or (baseline is not None and baseline - next_room > baseline // 2)
             ):
                 continue
             candidate = next_state
@@ -689,9 +688,7 @@ class BaseGuard:
                     self._overflow_finding(
                         policy=compiled,
                         label=(
-                            "too_many_items"
-                            if is_global
-                            else compiled.policy.item_overflow_label
+                            "too_many_items" if is_global else compiled.policy.item_overflow_label
                         ),
                         allow=allow,
                     )
@@ -718,9 +715,7 @@ class BaseGuard:
             if len(partitions) != 1:
                 raise PolicyError("item policy questions must remain in one partition")
             partition = partitions[0]
-            id_map = {
-                local: f"{compiled.policy.name}.{local}" for local in compiled.questions
-            }
+            id_map = {local: f"{compiled.policy.name}.{local}" for local in compiled.questions}
             base_state = self._fit_context(
                 stage=prepared.stage,
                 contexts=prepared.contexts,
@@ -790,13 +785,9 @@ class BaseGuard:
                     )
                     logical_index += 1
 
-        slots = sum(
-            request.backend.capabilities.max_attempts for request in requests
-        )
+        slots = sum(request.backend.capabilities.max_attempts for request in requests)
         if slots > self._limits.max_requests:
-            findings.append(
-                Finding(policy="jes", label="too_many_requests", action="block")
-            )
+            findings.append(Finding(policy="jes", label="too_many_requests", action="block"))
             return CheckPlan(requests=(), findings=findings, complete=False)
         return CheckPlan(requests=tuple(requests), findings=findings, complete=complete)
 
@@ -1168,4 +1159,3 @@ class BaseGuard:
             usage=usage,
             timings=timings,
         )
-

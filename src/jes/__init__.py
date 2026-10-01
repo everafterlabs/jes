@@ -58,4 +58,3 @@ __all__ = [
     "YesNo",
     "__version__",
 ]
-

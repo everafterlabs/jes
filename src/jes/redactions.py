@@ -334,4 +334,3 @@ class RedactionTransaction:
     def _ensure_open(self) -> None:
         if self._closed:
             raise RedactionError("redaction transaction is closed")
-

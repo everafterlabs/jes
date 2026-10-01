@@ -279,4 +279,3 @@ class InputResult(ScanResult):
 
 
 History: TypeAlias = InputResult | ScanResult | Message
-

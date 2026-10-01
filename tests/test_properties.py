@@ -80,7 +80,7 @@ def test_merge_is_monotonic(actions: list[str], values: list[float]) -> None:
     assert len(merged) == 1
     rank = {"flag": 0, "redact": 1, "block": 2}
     assert rank[merged[0].action] == max(rank[item.action] for item in findings)
-    scores = merge_scores([{ "p.q": item.score } for item in findings if item.score is not None])
+    scores = merge_scores([{"p.q": item.score} for item in findings if item.score is not None])
     expected = max(item.score.value for item in findings if item.score is not None)
     assert scores["p.q"].value == expected
 

@@ -29,12 +29,11 @@ this repo at build time, so edit them here:
 
 - `examples/*.py`, which the cookbook embeds, and `docs/cookbook.md`
 - `CHANGELOG.md`
-- `docs/design.md` and `evals/protocol.md`
+- `docs/design.md`
 
 A change to a name in any module's `__all__` also needs an update to the API
 reference in `jes-docs`, whose CI checks for missing names.
 
 ## Pull requests
 
-Keep changes small, explain observable behavior, and include tests. Generated
-evaluation results must identify their immutable request and decision profiles.
+Keep changes small, explain observable behavior, and include tests.

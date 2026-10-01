@@ -85,9 +85,7 @@ def test_threshold_boundaries() -> None:
     topic = Guard([topics(("weather",), threshold=0.5)], model=backend).check_input("boundary")
     assert topic.decision == "block"
     backend.register_answer("toxicity", YesNoAnswer(0.5, "probability"))
-    toxic = Guard([toxicity(("toxicity",), threshold=0.5)], model=backend).check_input(
-        "boundary"
-    )
+    toxic = Guard([toxicity(("toxicity",), threshold=0.5)], model=backend).check_input("boundary")
     assert toxic.decision == "block"
 
 

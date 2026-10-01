@@ -200,11 +200,8 @@ def build_decision_profile(
     backend: Backend,
 ) -> DecisionProfile:
     kinds = _digest(
-        
-            f"{question.task}:"
-            + ",".join(sorted(backend.capabilities.supported_kinds(question.task)))
-            for question in questions.values()
-        
+        f"{question.task}:" + ",".join(sorted(backend.capabilities.supported_kinds(question.task)))
+        for question in questions.values()
     )
     subset = _digest(sorted(questions))
     fingerprint = _digest(
@@ -284,9 +281,7 @@ def compile_guard(
         for question_id, question in question_map.items():
             validate_identifier(question_id, field="question id")
             if not backend.capabilities.supports_task(question.task):
-                raise PolicyError(
-                    f"backend {backend.name} does not support task {question.task}"
-                )
+                raise PolicyError(f"backend {backend.name} does not support task {question.task}")
             if not backend.capabilities.supported_kinds(question.task):
                 raise PolicyError(
                     f"backend {backend.name} does not support score kinds for {question.task}"
@@ -351,9 +346,7 @@ def compile_guard(
                 continue
             looked_up = defaults.lookup(decision.fingerprint)
             if looked_up is None:
-                raise PolicyError(
-                    f"judgment {policy.name} has no threshold for stage {stage}"
-                )
+                raise PolicyError(f"judgment {policy.name} has no threshold for stage {stage}")
             thresholds[stage] = looked_up[0]
             sources[stage] = "default"
             runs[stage] = looked_up[1]
@@ -439,9 +432,7 @@ def neutralize_placeholders(
     tracked: frozenset[str] = frozenset(),
 ) -> tuple[str, tuple[Span, ...], tuple[Span, ...], tuple[str, ...]]:
     edits, preserved = placeholder_edits(text, tracked=tracked)
-    spans = tuple(
-        _map_span(mapping, Span(edit.start, edit.end), original_length) for edit in edits
-    )
+    spans = tuple(_map_span(mapping, Span(edit.start, edit.end), original_length) for edit in edits)
     if not edits:
         return text, tuple(mapping), (), preserved
     rewritten, rewritten_mapping = _apply_mapping(text, mapping, edits, original_length)
@@ -798,4 +789,3 @@ def chunk_text(
             next_start = start + 1
         start = next_start
     return tuple(chunks)
-

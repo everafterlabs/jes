@@ -151,10 +151,7 @@ class ScoreAnswer:
     def __post_init__(self) -> None:
         if not self.scores:
             raise BackendError("answer", "score answer has no levels")
-        checked = tuple(
-            _validate_unit(value, field="level score")
-            for value in self.scores
-        )
+        checked = tuple(_validate_unit(value, field="level score") for value in self.scores)
         if not math.isclose(sum(checked), 1.0, abs_tol=_SUM_TOLERANCE):
             raise BackendError("answer", "level scores do not sum to one")
         _validate_confidence(self.confidence)
@@ -232,4 +229,3 @@ def violation_score(
     if violation_level is None or not 0 <= violation_level < len(question.levels):
         raise PolicyError("score questions require a valid violation_level")
     return sum(answer.scores[violation_level:])
-

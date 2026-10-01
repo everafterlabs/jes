@@ -24,6 +24,7 @@ jobs:
           enable-cache: true
       - run: uv sync --frozen --group examples
       - run: uv run --frozen ruff check .
+      - run: uv run --frozen ruff format --check .
       - run: uv run --frozen pyright
       - run: uv run --frozen --group examples pytest
 

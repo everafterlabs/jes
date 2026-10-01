@@ -151,5 +151,3 @@ def _response_text(payload: Mapping[str, object]) -> str:
     if isinstance(value, str):
         return value
     raise ConfigError("invalid response_text")
-
-

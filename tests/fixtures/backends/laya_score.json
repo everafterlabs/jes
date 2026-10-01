@@ -1,9 +1,0 @@
-{
-  "answers": {
-    "severity": {
-      "scores": [0.1, 0.2, 0.7],
-      "confidence": 0.6
-    }
-  },
-  "usage": {"input_tokens": 38, "output_tokens": 6}
-}

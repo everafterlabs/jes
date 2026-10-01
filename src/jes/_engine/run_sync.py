@@ -212,9 +212,7 @@ class Guard(BaseGuard):
                     try:
                         plan = self.plan(prepared)
                     except ResourceLimit as error:
-                        prepared.findings.append(
-                            self._overflow_finding_for_engine(error.label)
-                        )
+                        prepared.findings.append(self._overflow_finding_for_engine(error.label))
                         plan = self._empty_plan(prepared.findings)
 
                     budget = self.request_budget(plan.requests)
@@ -254,9 +252,7 @@ class Guard(BaseGuard):
                                 )
                             )
                         else:
-                            executions.append(
-                                RequestExecution(request=request, result=response)
-                            )
+                            executions.append(RequestExecution(request=request, result=response))
                     interpretation = self.interpret(executions)
                     judgment_ms = (time.perf_counter() - started) * 1_000
                     return self.result(
@@ -291,4 +287,3 @@ class Guard(BaseGuard):
     @staticmethod
     def _empty_plan(findings: list[Finding]) -> CheckPlan:
         return CheckPlan(requests=(), findings=findings, complete=False)
-

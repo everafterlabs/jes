@@ -85,9 +85,7 @@ class SharedAdmission:
     def __init__(self, limits: GuardLimits) -> None:
         self._checks = threading.BoundedSemaphore(limits.max_active_checks)
         self.backend_calls = threading.BoundedSemaphore(limits.max_concurrency)
-        self._work = threading.BoundedSemaphore(
-            limits.max_worker_threads + limits.max_queued_work
-        )
+        self._work = threading.BoundedSemaphore(limits.max_worker_threads + limits.max_queued_work)
         self._executor = ThreadPoolExecutor(
             max_workers=limits.max_worker_threads,
             thread_name_prefix="jes",
@@ -217,4 +215,3 @@ class CheckRequestBudget(RequestBudget):
             if acquired:
                 self._backend.release()
             self._finish(logical_index, attempt, used=acquired)
-
