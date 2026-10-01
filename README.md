@@ -252,3 +252,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT
 ## License
 
 Apache-2.0. This project is independent. It isn't affiliated with [TypeSafe.ai](https://typesafe.ai).
+
+jes is written with AI coding assistants. A human decides what ships, and every change runs through the test suite and CI. jes lowers risk but doesn't remove it: decision models can miss an attack or block safe text, so use jes as one layer of defense, not the only one. The software is provided as is, with no warranty or liability (sections 7 and 8 of the [license](LICENSE)).
