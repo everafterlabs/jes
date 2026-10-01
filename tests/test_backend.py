@@ -200,10 +200,28 @@ def test_classifier_errors_become_backend_errors(
         asyncio.run(TypeSafe(FakeClassifier(error=error)).adecide(_request()))
 
 
-def test_a_missing_api_key_is_a_setup_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
-    with pytest.raises(BackendError, match="client_setup_failed"):
+@pytest.mark.parametrize("key", [None, "", "  "])
+def test_a_missing_api_key_is_named(monkeypatch: pytest.MonkeyPatch, key: str | None) -> None:
+    if key is None:
+        monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    else:
+        monkeypatch.setenv("TYPESAFE_API_KEY", key)
+    with pytest.raises(BackendError, match="missing_api_key"):
         TypeSafe("jev-test").decide(_request())
+    with pytest.raises(BackendError, match="missing_api_key"):
+        asyncio.run(TypeSafe("jev-test").adecide(_request()))
+
+
+def test_other_client_setup_failures_hide_the_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    def broken(**_kwargs: object) -> None:
+        raise ValueError("secret detail")
+
+    monkeypatch.setenv("TYPESAFE_API_KEY", "test-key")
+    monkeypatch.setattr("langchain_typesafe.TypeSafeClassifier", broken)
+    with pytest.raises(BackendError, match="client_setup_failed") as raised:
+        TypeSafe("jev-test").decide(_request())
+    assert "secret detail" not in str(raised.value)
+    assert raised.value.__cause__ is None
 
 
 def test_a_model_id_builds_one_classifier(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -7,6 +7,7 @@ A custom backend is any object with ``name``, ``model``, ``headroom``, and ``dec
 from __future__ import annotations
 
 import json
+import os
 import threading
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -186,14 +187,15 @@ class TypeSafe:
             if self._classifier is None:
                 from langchain_typesafe import TypeSafeClassifier
 
+                if not os.environ.get("TYPESAFE_API_KEY", "").strip():
+                    raise BackendError(self.name, "missing_api_key")
                 try:
                     self._classifier = cast(
                         "DecisionClassifier",
                         TypeSafeClassifier(model=self.model, timeout=self._timeout),
                     )
                 except Exception:
-                    # Most often TYPESAFE_API_KEY is not set. The message is not repeated:
-                    # jes errors carry metadata only.
+                    # The message is not repeated: jes errors carry metadata only.
                     raise BackendError(self.name, "client_setup_failed") from None
             return self._classifier
 

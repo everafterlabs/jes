@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import Literal, cast
 
 from jes.agents.sessions import SessionStore
-from jes.errors import ConfigError, PolicyError
+from jes.errors import BackendError, ConfigError, PolicyError
 from jes.guard import Guard, freeze_arguments
 from jes.policies.transforms import valid_tool_name
 from jes.result import Result, finding_name, refusal as refusal_text
@@ -68,6 +68,16 @@ def refusal(stage: Stage) -> HookResponse:
     )
 
 
+def _failure(error: Exception) -> str:
+    """The error's type, plus a backend's reason. Neither carries checked text."""
+
+    if not isinstance(error, BackendError):
+        return type(error).__name__
+    if error.reason == "missing_api_key":
+        return "TYPESAFE_API_KEY is not set; run jes login"
+    return f"{type(error).__name__}: {error.reason}"
+
+
 def run_hook(event: HookEvent, *, guard: Guard, sessions: SessionStore) -> HookResponse:
     """Run one check. An allowed input becomes the session's prompt."""
 
@@ -80,7 +90,7 @@ def run_hook(event: HookEvent, *, guard: Guard, sessions: SessionStore) -> HookR
     try:
         result = _check(event, guard, prompt)
     except Exception as error:
-        print(f"jes: check failed ({type(error).__name__})", file=sys.stderr)
+        print(f"jes: check failed ({_failure(error)})", file=sys.stderr)
         return refusal(event.stage)
     if event.stage == "input" and result.ok and event.session_id is not None:
         sessions.save_prompt(event.session_id, result.onward)
