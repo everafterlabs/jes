@@ -126,3 +126,10 @@ def test_text_must_match_the_map() -> None:
 
 def test_edit_repr_hides_the_replacement() -> None:
     assert repr(Edit(1, 2, "secret")) == "Edit(start=1, end=2, replacement_len=6)"
+
+
+def test_chunks_give_up_when_nothing_fits() -> None:
+    from jes.engine.chunking import chunk_spans
+
+    assert chunk_spans("abc", lambda chunk: False, 10) is None
+    assert chunk_spans("", lambda chunk: True, 1) == [Span(0, 0)]

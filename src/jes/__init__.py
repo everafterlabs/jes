@@ -13,8 +13,11 @@ from jes.errors import (
     PolicyExecutionError,
     RedactionError,
 )
+from jes.guard import AsyncGuard, Guard
 from jes.limits import Limits
 from jes.questions import Choice, Score, Threshold, YesNo
+from jes.redactions import Redactions
+from jes.result import Result
 from jes.types import Finding, Message, ScoreResult, Span, Stage, Usage
 
 try:
@@ -23,17 +26,21 @@ except PackageNotFoundError:  # pragma: no cover - only when run from an uninsta
     __version__ = "0+unknown"
 
 __all__ = [
+    "AsyncGuard",
     "BackendError",
     "Choice",
     "ConfigError",
     "DeadlineExceeded",
     "Finding",
+    "Guard",
     "JesError",
     "Limits",
     "Message",
     "PolicyError",
     "PolicyExecutionError",
     "RedactionError",
+    "Redactions",
+    "Result",
     "Score",
     "ScoreResult",
     "Span",
