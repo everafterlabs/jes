@@ -97,9 +97,22 @@ def test_parse_origin_accepts_bare_origins_only() -> None:
 
 def test_origins_need_the_pii_extra_for_names(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(sys.modules, "idna", None)
-    assert canonical_origin("http://127.0.0.1/") == ("http", "127.0.0.1", 80)
+    assert parse_origin("http://127.0.0.1") == ("http", "127.0.0.1", 80)
     with pytest.raises(PolicyError, match=r"jes\[pii\]"):
-        canonical_origin("https://app.example.com/")
+        parse_origin("https://app.example.com")
+    # A check never raises for it: without idna a name matches no origin.
+    assert canonical_origin("https://app.example.com/") is None
+    store, email, _name = _store()
+    for origins in (frozenset(), frozenset({parse_origin("http://127.0.0.1")})):
+        restored, findings = restore_tokens(
+            f"See https://evil.example/?u={email}",
+            lookup=store._value,
+            authorized=[email],
+            origins=origins,
+            on_url="block",
+        )
+        assert email in restored
+        assert [(item.label, item.action) for item in findings] == [("placeholder_in_url", "block")]
 
 
 def _store() -> tuple[Redactions, str, str]:

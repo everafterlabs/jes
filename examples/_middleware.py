@@ -9,25 +9,41 @@ Three hooks cover the places untrusted text meets an agent:
 
 A blocked step is replaced by ``result.onward``. Nothing blocked runs or
 reaches the model.
+
+The turn's checked input lives in the agent's state, not on the middleware,
+so one agent can serve many conversations at once.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Container
-from typing import Any
+from typing import Any, NotRequired
 
-from langchain.agents.middleware import AgentMiddleware, ModelRequest, ModelResponse, hook_config
+from langchain.agents.middleware import (
+    AgentMiddleware,
+    AgentState,
+    ModelRequest,
+    ModelResponse,
+    hook_config,
+)
 from langchain.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.runtime import Runtime
 from langgraph.types import Command
 
 from examples._common import Check
-from jes import Guard
-from jes.types import InputResult, ScanResult
+from jes import Guard, Result
 
 
-class JesMiddleware(AgentMiddleware):
-    """Guard one agent and log every check and tool call it makes."""
+class JesState(AgentState):
+    """The agent's state, plus this turn's checked user message."""
+
+    jes_input: NotRequired[Result]
+
+
+class JesMiddleware(AgentMiddleware[JesState]):
+    """Guard one agent. The ``checks`` and ``tools_called`` lists are a log for the lessons."""
+
+    state_schema = JesState
 
     def __init__(
         self,
@@ -46,33 +62,33 @@ class JesMiddleware(AgentMiddleware):
         # Share these lists between middlewares to log a whole agent tree in order.
         self.checks: list[Check] = [] if checks is None else checks
         self.tools_called: list[str] = [] if tools_called is None else tools_called
-        # Later checks pass this turn's checked input as prompt=, so they judge
-        # against what the user asked, with the same redactions.
-        self.incoming: InputResult | None = None
 
     @property
     def name(self) -> str:
         return f"JesMiddleware[{self.label or 'agent'}]"
 
-    def _record(self, stage: str, result: ScanResult) -> None:
+    def _record(self, stage: str, result: Result) -> None:
         self.checks.append(Check(f"{self.label} {stage}".strip(), result))
 
     @hook_config(can_jump_to=["end"])
-    def before_model(self, state: Any, runtime: Runtime) -> dict[str, Any] | None:
+    def before_model(self, state: JesState, runtime: Runtime) -> dict[str, Any] | None:
         del runtime  # Unused, but LangChain passes it by name.
         last = state["messages"][-1]
         # Later model calls in the same turn follow a tool result, not the user.
         if not isinstance(last, HumanMessage):
             return None
         incoming = self.guard.check_input(last.text)
-        self.incoming = incoming
         self._record("input", incoming)
         if not incoming.ok:
-            return {"messages": [AIMessage(incoming.onward)], "jump_to": "end"}
+            return {
+                "messages": [AIMessage(incoming.onward)],
+                "jump_to": "end",
+                "jes_input": incoming,
+            }
         if incoming.onward != last.text:
             # Same id, so this replaces the raw message in state.
-            return {"messages": [HumanMessage(incoming.onward, id=last.id)]}
-        return None
+            return {"messages": [HumanMessage(incoming.onward, id=last.id)], "jes_input": incoming}
+        return {"jes_input": incoming}
 
     def wrap_model_call(
         self, request: ModelRequest, handler: Callable[[ModelRequest], ModelResponse]
@@ -81,7 +97,7 @@ class JesMiddleware(AgentMiddleware):
         message = response.result[-1]
         if not isinstance(message, AIMessage) or message.tool_calls:
             return response
-        outgoing = self.guard.check_output(message.text, prompt=self._prompt(request.messages))
+        outgoing = self.guard.check_output(message.text, prompt=_prompt(request.state))
         self._record("output", outgoing)
         if outgoing.ok and outgoing.onward == message.text:
             return response
@@ -92,7 +108,7 @@ class JesMiddleware(AgentMiddleware):
     ) -> ToolMessage | Command[Any]:
         call = request.tool_call
         name = str(call["name"])
-        prompt = self._prompt(request.state["messages"])
+        prompt = _prompt(request.state)
 
         def refuse(text: str) -> ToolMessage:
             return ToolMessage(content=text, tool_call_id=call["id"], name=name)
@@ -119,12 +135,14 @@ class JesMiddleware(AgentMiddleware):
         # A Command could carry more state than the report; pass on only what was checked.
         return Command(update={"messages": [message]}) if isinstance(outcome, Command) else outcome
 
-    def _prompt(self, messages: list[Any]) -> InputResult | str:
-        """This turn's checked input, else the latest user message."""
 
-        if self.incoming is not None:
-            return self.incoming
-        for message in reversed(messages):
-            if isinstance(message, HumanMessage):
-                return message.text
-        return ""
+def _prompt(state: Any) -> Result | str:
+    """This turn's checked input, else the latest user message."""
+
+    incoming = state.get("jes_input")
+    if isinstance(incoming, Result):
+        return incoming
+    for message in reversed(state["messages"]):
+        if isinstance(message, HumanMessage):
+            return message.text
+    return ""

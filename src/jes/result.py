@@ -53,7 +53,6 @@ class Result:
     duration_ms: float
     redactions: Redactions
     _onward: str = field(default="")
-    _issuer: object = field(default=None)
 
     @property
     def allowed(self) -> bool:

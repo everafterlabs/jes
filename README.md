@@ -208,7 +208,7 @@ OpenCode, OpenClaw and Pi also need the file that `uvx jes runner-settings` prin
 More in the [recipes](https://docs.getjes.dev/recipes) and the [cookbook](https://docs.getjes.dev/cookbook).
 
 <details>
-<summary><b>Learn jes in 17 lessons</b></summary>
+<summary><b>Learn jes in 15 lessons</b></summary>
 
 [examples/](examples/README.md) is a short course, read top to bottom. Each lesson has a `jev.py` on hosted Jev and a `local.py` that runs fully on Ollama with `tev1`.
 
@@ -226,7 +226,7 @@ More in the [recipes](https://docs.getjes.dev/recipes) and the [cookbook](https:
 
 **How do I protect an AI agent from prompt injection?** Check more than the user's message. Most attacks are *indirect*: hidden in a web page, a file or a tool result. Use `indirect_injection` on `check_untrusted` and `check_tool_result`, and gate tools with `allowed_tools` and `tool_safety`.
 
-**Why a decision model instead of an LLM-as-judge?** An LLM judge reads the attack as part of its own prompt, and the attack can steer its answer. Jev only answers typed questions with probabilities, and the checked text is never part of an instruction. It also classifies instead of generating, so there's no long response to wait on or pay for. That keeps latency and cost low enough to check every step, not just the first prompt. `AsyncGuard` runs each check's judgments in parallel, so adding guards doesn't add their latencies up.
+**Why a decision model instead of an LLM-as-judge?** An LLM judge reads the attack as part of its own prompt, and the attack can steer its answer. Jev only answers typed questions with probabilities, and the checked text is never part of an instruction. It also classifies instead of generating, so there's no long response to wait on or pay for. That keeps latency and cost low enough to check every step, not just the first prompt. Judgments on the same model share one request, and `Guard` and `AsyncGuard` send a check's requests in parallel, so adding guards doesn't add their latencies up.
 
 **Does jes send my secrets or personal data to a model?** No. `secrets` and `pii` run locally first, and judgments only see the redacted text.
 
@@ -237,14 +237,14 @@ More in the [recipes](https://docs.getjes.dev/recipes) and the [cookbook](https:
 <details>
 <summary><b>Install extras</b></summary>
 
-`jes[pii]` (Presidio, plus a spaCy English model) · `jes[secrets]` (detect-secrets) · `jes[crypto]` (encrypted `Redactions`) · `jes[tokens]` (tiktoken) · `jes[regex]` · `jes[json]`. Python 3.11+.
+`jes[pii]` (Presidio for the `PERSON` entity, which also needs a spaCy English model such as `en_core_web_sm`; the other entities need neither) · `jes[secrets]` (detect-secrets) · `jes[crypto]` (encrypted `Redactions`) · `jes[tokens]` (tiktoken) · `jes[regex]` · `jes[json]`. Python 3.11+.
 
 </details>
 
 ## Development
 
 ```bash
-uv sync --dev && uv run ruff check . && uv run pyright && uv run pytest
+uv sync --dev && uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run pytest
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md).

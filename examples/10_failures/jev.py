@@ -1,7 +1,7 @@
 """Lesson 10 (Jev): When the decision model fails.
 
 on_backend_error picks what a failed check does: raise, block, or allow.
-max_input_bytes blocks oversized text before any model call.
+Limits(max_input_bytes=...) blocks oversized text before any model call.
 
 Run:   uv run --group examples python -m examples.10_failures.jev
 Needs: nothing (the backend is down on purpose)
@@ -10,7 +10,7 @@ Needs: nothing (the backend is down on purpose)
 from langchain_typesafe import TypeSafeClassifier
 
 from examples._common import print_check
-from jes import Guard
+from jes import Guard, Limits
 from jes.errors import BackendError
 from jes.policies import injection
 
@@ -42,7 +42,9 @@ def main() -> None:
     print(f"  complete={allowed.complete} ok={allowed.ok}")
 
     print("== byte cap")
-    capped = Guard(POLICIES, model=MODEL, max_input_bytes=4).check_input("too long for the cap")
+    capped = Guard(POLICIES, model=MODEL, limits=Limits(max_input_bytes=4)).check_input(
+        "too long for the cap"
+    )
     print_check("input", capped)
 
 

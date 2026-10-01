@@ -24,7 +24,7 @@ from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command, RetryPolicy
 
 from examples._common import Check, Run, print_run
-from jes import Guard, InputResult
+from jes import Guard, Result
 from jes.policies import allowed_tools, hazards, indirect_injection, injection
 
 # tev1 on Ollama. Ollama ignores the key; passing one keeps your real
@@ -81,7 +81,7 @@ def read_inbox() -> str:
 class State(MessagesState):
     question: str
     # Later checks pass the checked input as prompt=, so they share its redactions.
-    incoming: InputResult
+    incoming: Result
 
 
 def build(guard: Guard, chat: BaseChatModel, tools: list[BaseTool], log: Run) -> CompiledStateGraph:

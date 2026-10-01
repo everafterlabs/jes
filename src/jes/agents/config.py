@@ -20,6 +20,7 @@ from typing import Literal, cast
 from jes.agents.files import jes_home, write_private
 from jes.errors import ConfigError, PolicyError
 from jes.policies import (
+    DEFAULT_PII_ENTITIES,
     Policy,
     allowed_tools,
     canary,
@@ -38,6 +39,9 @@ from jes.policies import (
 )
 
 DEFAULT_MODEL = "jev-latest"
+# Hooks run under uvx, which installs no spaCy model, so their pii default leaves out
+# PERSON. Listing PERSON in entities asks for it, and fails when it cannot run.
+HOOK_PII_ENTITIES = tuple(entity for entity in DEFAULT_PII_ENTITIES if entity != "PERSON")
 
 _Kind = Literal["bool", "unit", "text", "texts", "choice", "count", "key"]
 
@@ -173,6 +177,7 @@ _GUARDS: dict[str, _Guard] = {
             restore=cast(bool, v["restore"]),
         ),
         {
+            "entities": list(HOOK_PII_ENTITIES),
             "input_mode": "redact",
             "untrusted_mode": "mask",
             "output_mode": "flag",
@@ -339,6 +344,7 @@ def _key(value: object, invalid: ConfigError) -> bytes:
 
 __all__ = [
     "DEFAULT_MODEL",
+    "HOOK_PII_ENTITIES",
     "AgentConfig",
     "config_path",
     "default_config",

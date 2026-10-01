@@ -36,9 +36,8 @@ from langchain_typesafe import TypeSafeClassifier
 from openai import AsyncOpenAI
 
 from examples._common import Check, Run, print_run
-from jes import AsyncGuard
+from jes import AsyncGuard, Result
 from jes.policies import allowed_tools, hazards, indirect_injection, injection
-from jes.types import InputResult
 
 # Traces would send prompts and search results to OpenAI.
 set_tracing_disabled(True)
@@ -96,7 +95,7 @@ class RunContext:
     """What every guardrail and tool in one run can read."""
 
     guard: AsyncGuard
-    incoming: InputResult
+    incoming: Result
     web_search: Callable[[str], str]
     log: Run = field(default_factory=Run)
 

@@ -81,6 +81,10 @@ def test_malicious_urls_judges_each_url() -> None:
     items = list(judgment.items("see http://a.example/x and https://b.example, not ftp://c"))
     assert [item.text for item in items] == ["http://a.example/x", "https://b.example,"]
     assert items[0].span == Span(4, 22)
+    # Browsers accept any case in the scheme, so an uppercase one must not slip past.
+    assert [item.text for item in judgment.items("go to HTTPS://evil.example/a")] == [
+        "HTTPS://evil.example/a"
+    ]
 
 
 def test_competitors_and_refusal_phrases() -> None:

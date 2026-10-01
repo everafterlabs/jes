@@ -63,9 +63,18 @@
     },
     "pii": {
       "enabled": false,
+      "entities": [
+        "EMAIL_ADDRESS",
+        "PHONE_NUMBER",
+        "CREDIT_CARD",
+        "US_SSN",
+        "IBAN_CODE",
+        "CRYPTO"
+      ],
       "input_mode": "redact",
       "untrusted_mode": "mask",
       "output_mode": "flag",
+      "tool_call_mode": "block",
       "restore": true
     },
     "secrets": {

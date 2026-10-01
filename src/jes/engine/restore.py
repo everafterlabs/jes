@@ -11,7 +11,7 @@ import ipaddress
 import re
 import secrets
 from collections.abc import Callable, Iterable
-from typing import Literal, TypeAlias
+from typing import Any, Literal, TypeAlias
 from urllib.parse import urlsplit
 
 from jes.errors import PolicyError
@@ -97,16 +97,26 @@ def parse_origin(value: str) -> Origin:
 
     parsed = urlsplit(value)
     origin = canonical_origin(value)
+    if origin is None and _load_idna() is None:
+        raise PolicyError("restore_origins with host names requires the jes[pii] extra")
     if origin is None or parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
         raise PolicyError("restore_origins entries must be http or https origins")
     return origin
 
 
-def _idna(host: str) -> str | None:
+def _load_idna() -> Any:
     try:
         import idna
     except ImportError:
-        raise PolicyError("restoring into URLs requires the jes[pii] extra") from None
+        return None
+    return idna
+
+
+def _idna(host: str) -> str | None:
+    # Without idna a name cannot be compared safely, so it matches no origin.
+    idna = _load_idna()
+    if idna is None:
+        return None
     try:
         return idna.encode(host, uts46=False, std3_rules=True).decode("ascii").lower()
     except (idna.IDNAError, UnicodeError, ValueError):

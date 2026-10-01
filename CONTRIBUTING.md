@@ -5,20 +5,26 @@
 ```bash
 uv sync --dev
 uv run ruff check .
+uv run ruff format --check .
 uv run pyright
 uv run pytest
+node --experimental-strip-types --test tests/plugins/*.test.ts   # Node 22
 ```
 
 ## Rules
 
-- CI must not download model weights or call live model providers.
+- CI must not download model weights or call live model providers. Use
+  `jes.testing.FakeBackend`, or a fake classifier as in `tests/test_backend.py`.
 - Fixtures must not contain hazardous content, secrets, or real personal data.
   Use fake backend scores and synthetic non-sensitive markers.
-- Built-in question text is versioned. Changing wording requires a new prompt
-  version; do not mutate an existing version in place.
+- Built-in question text is frozen in `src/jes/policies/prompts.py`, and
+  `tests/test_prompts.py` records a hash of each question. A wording change
+  needs a new constant and id, such as `INJECTION_V2`. Do not edit an existing
+  one in place.
 - Public APIs must remain typed under strict pyright.
-- New built-in backends must pass `jes.testing.check_backend_contract`.
-- Security-sensitive edits need tests for all applicable guarantees in section 5
+- A new built-in backend implements the protocol in `src/jes/backend.py` and
+  turns every failure into `BackendError`.
+- Security-sensitive edits need tests for all applicable guarantees in section 3
   of `docs/design.md`.
 
 ## Documentation

@@ -21,7 +21,7 @@ def chat_model() -> BaseChatModel:
 
 
 SYSTEM = (
-    "Answer in one short sentence. Copy any [JES_v1_PII_...] placeholder "
+    "Answer in one short sentence. Copy any [JES_PII_...] placeholder "
     "exactly as written; it stands for the user's real value."
 )
 # Demo only. Load a real 32-byte key from your secret manager.
@@ -29,7 +29,9 @@ STORE_KEY = b"k" * 32
 
 
 def main() -> None:
-    guard = Guard([pii()])
+    # The default entities include PERSON, which needs jes[pii] and a spaCy model.
+    # Email is a local pattern, so this lesson runs without either.
+    guard = Guard([pii(["EMAIL_ADDRESS"])])
     # The scope names the store; loading a saved store needs the same scope.
     store = Redactions(scope=b"conversation-1")
 

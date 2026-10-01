@@ -12,6 +12,7 @@ import pytest
 
 from jes.agents.config import (
     DEFAULT_MODEL,
+    HOOK_PII_ENTITIES,
     config_path,
     default_config,
     default_text,
@@ -20,6 +21,7 @@ from jes.agents.config import (
     write_default_config,
 )
 from jes.errors import ConfigError
+from jes.policies.sensitive import DEFAULT_PII_ENTITIES, Pii
 from jes.questions import YesNoAnswer
 from jes.testing import FakeBackend
 from tests.agents.helpers import argv, run
@@ -120,6 +122,21 @@ def test_minimal_guards_use_factory_defaults() -> None:
         }
     }
     assert _names(document) == list(document["guards"])
+
+
+def test_a_pii_guard_without_entities_leaves_out_person(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Hooks run under uvx, which installs no spaCy model, so 1.x hooks never found PERSON.
+    # An enabled pii guard from a 1.x config must keep working, not refuse every check.
+    monkeypatch.setattr("jes.policies.sensitive._installed_spacy_model", lambda: None)
+    document: dict[str, Any] = {"guards": {"pii": {"enabled": True}}}
+    (policy,) = parse_config(document).policies()
+    assert isinstance(policy, Pii)
+    assert policy.entities == frozenset(DEFAULT_PII_ENTITIES) - {"PERSON"}
+    # The file jes login writes spells out the same list.
+    assert tuple(_document()["guards"]["pii"]["entities"]) == HOOK_PII_ENTITIES
+    document["guards"]["pii"]["entities"] = ["PERSON"]
+    with pytest.raises(ConfigError, match="pii: PERSON"):
+        parse_config(document).policies()
 
 
 @pytest.mark.parametrize(

@@ -46,7 +46,7 @@ REFUSAL_PHRASES: tuple[str, ...] = (
     "I will not provide that",
 )
 
-_URL = re.compile(r"https?://[^\s<>\"']+")
+_URL = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
 _WORD = re.compile(r"\S+")
 _WORDS_PER_MINUTE = 200
 # json_check tries at most this many "{" or "[" positions before it gives up.

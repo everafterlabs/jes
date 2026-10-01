@@ -63,15 +63,15 @@ guard = Guard(
 ```
 
 `tev1` scores sit in a narrower band than Jev's, so tune its thresholds on your
-own traffic. Lessons 16 and 17 run on `tev1`.
+own traffic. Every lesson's `local.py` runs on `tev1`.
 
 ## 3. The model call
 
 `examples/02_model_call/jev.py` uses one guard. It allows an ordinary input, blocks an
 untrusted instruction, and does not pass that blocked result onward. The output
-check uses `hazards` and blocks when `hazard.any` crosses the threshold. The
-finding is named `S1` because that category score also crosses. Other hazard
-scores are the mock's default of zero.
+check uses `hazards`, which asks one question per category, S1 to S14. A
+finding names each category whose score crosses the threshold, such as `S1`.
+Pass `hazards(["S1", "S2"], threshold=...)` to ask about those categories only.
 
 ## 4. Tool calls
 
@@ -126,15 +126,15 @@ uv run --group examples python -m examples.12_openai_agents_sdk.jev
 ## 5. PII across one conversation
 
 `examples/04_pii/jev.py` keeps one `Redactions` store. `sanitized` hides
-`ada@example.com`. The complete reply restores it into `text`. A second input
+`ada@example.com`. The complete reply restores it into `onward`. A second input
 of the same address reuses the placeholder. `dumps` / `loads` needs the same
 32-byte key, scope, and associated data (`jes[crypto]`).
 
 ## 6. Secrets and a canary
 
 `examples/05_secrets_canary/jev.py` redacts an `sk-` token on input. On output,
-`canary("CANARY-TOKEN")` removes that marker from the backend projection and
-blocks, including when `fail_fast` is false.
+`canary("CANARY-TOKEN")` removes that marker from what the judges see and
+blocks, including when `fail_fast` is false. It checks tool calls too.
 
 ## 7. Topics and toxicity
 
@@ -161,7 +161,7 @@ the whole output and receives `sources`. The rest of the catalog is
 * `on_backend_error="raise"` raises `BackendError`.
 * `"block"` returns a block and `complete=False`.
 * `"allow"` does not add a block for that failure. `complete` is still false, so `ok` is false. `onward` is `Blocked: backend_error.` and does not contain the checked text.
-* `max_input_bytes=4` blocks with `input_too_long` before a judgment runs. `onward` is `Blocked: input_too_long.`
+* `limits=Limits(max_input_bytes=4)` blocks with `input_too_long` before a judgment runs. `onward` is `Blocked: input_too_long.`
 
 ## 11. Async
 

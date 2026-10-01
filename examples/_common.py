@@ -4,16 +4,21 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import NamedTuple
 
-from jes._env import load_project_env
-from jes.types import ScanResult
+from jes import Result
+from jes.agents.env import apply_env_file
+
+# The lessons read keys from the .env at the root of this checkout.
+_DOTENV = Path(__file__).resolve().parents[1] / ".env"
 
 
 def require_env(*names: str) -> None:
     """Load ``.env`` and exit with a clear message if a key is missing."""
 
-    load_project_env()
+    if _DOTENV.is_file():
+        apply_env_file(_DOTENV, os.environ)
     missing = [name for name in names if not os.environ.get(name, "").strip()]
     if missing:
         raise SystemExit(f"{', '.join(missing)} not set. Add it to the environment or .env.")
@@ -21,7 +26,7 @@ def require_env(*names: str) -> None:
 
 class Check(NamedTuple):
     label: str
-    result: ScanResult
+    result: Result
 
 
 @dataclass
@@ -33,7 +38,7 @@ class Run:
     reply: str = ""
 
 
-def print_check(label: str, result: ScanResult) -> None:
+def print_check(label: str, result: Result) -> None:
     """The decision and top score, plus the onward text if jes blocked or flagged it."""
 
     top = max(result.scores.items(), key=lambda item: item[1].value, default=None)
