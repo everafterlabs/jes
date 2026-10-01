@@ -23,10 +23,11 @@ from langgraph.types import Command
 
 from examples._common import Check
 from jes import Guard
+from jes.types import InputResult, ScanResult
 
 
 class JesMiddleware(AgentMiddleware):
-    """Guard one agent. ``checks`` collects every result; ``ran`` every tool that ran."""
+    """Guard one agent and log every check and tool call it makes."""
 
     def __init__(
         self,
@@ -35,41 +36,42 @@ class JesMiddleware(AgentMiddleware):
         label: str = "",
         subagents: Container[str] | None = None,
         checks: list[Check] | None = None,
-        ran: list[str] | None = None,
+        tools_called: list[str] | None = None,
     ) -> None:
         super().__init__()
         self.guard = guard
-        self.label = f"{label} " if label else ""
+        self.label = label
         # Deep Agents only: the ``task`` subagents allowed to run.
         self.subagents = subagents
-        # Pass the same lists to several middlewares to log one agent tree in order.
+        # Share these lists between middlewares to log a whole agent tree in order.
         self.checks: list[Check] = [] if checks is None else checks
-        self.ran: list[str] = [] if ran is None else ran
-        # This turn's checked input. Later checks pass it as prompt= so they
-        # judge against what the user asked, with the same redactions.
-        self.incoming: Any = None
+        self.tools_called: list[str] = [] if tools_called is None else tools_called
+        # Later checks pass this turn's checked input as prompt=, so they judge
+        # against what the user asked, with the same redactions.
+        self.incoming: InputResult | None = None
 
     @property
     def name(self) -> str:
-        return f"JesMiddleware[{self.label.strip() or 'agent'}]"
+        return f"JesMiddleware[{self.label or 'agent'}]"
 
-    def _record(self, stage: str, result: Any) -> Any:
-        self.checks.append(Check(f"{self.label}{stage}", result))
-        return result
+    def _record(self, stage: str, result: ScanResult) -> None:
+        self.checks.append(Check(f"{self.label} {stage}".strip(), result))
 
     @hook_config(can_jump_to=["end"])
     def before_model(self, state: Any, runtime: Runtime) -> dict[str, Any] | None:
-        del runtime
+        del runtime  # Unused, but LangChain passes it by name.
         last = state["messages"][-1]
-        # Only a fresh user turn. Later model calls in the same turn are the tool loop.
+        # Later model calls in the same turn follow a tool result, not the user.
         if not isinstance(last, HumanMessage):
             return None
-        checked = self.incoming = self._record("input", self.guard.check_input(last.text))
-        if not checked.ok:
-            return {"messages": [AIMessage(checked.onward)], "jump_to": "end"}
-        if checked.onward != last.text:
+        incoming = self.guard.check_input(last.text)
+        self.incoming = incoming
+        self._record("input", incoming)
+        if not incoming.ok:
+            return {"messages": [AIMessage(incoming.onward)], "jump_to": "end"}
+        if incoming.onward != last.text:
             # Same id, so this replaces the raw message in state.
-            return {"messages": [HumanMessage(checked.onward, id=last.id)]}
+            return {"messages": [HumanMessage(incoming.onward, id=last.id)]}
         return None
 
     def wrap_model_call(
@@ -79,12 +81,11 @@ class JesMiddleware(AgentMiddleware):
         message = response.result[-1]
         if not isinstance(message, AIMessage) or message.tool_calls:
             return response
-        checked = self._record(
-            "output", self.guard.check_output(message.text, prompt=self._prompt(request.messages))
-        )
-        if checked.ok and checked.onward == message.text:
+        outgoing = self.guard.check_output(message.text, prompt=self._prompt(request.messages))
+        self._record("output", outgoing)
+        if outgoing.ok and outgoing.onward == message.text:
             return response
-        return ModelResponse(result=[AIMessage(content=checked.onward, id=message.id)])
+        return ModelResponse(result=[AIMessage(content=outgoing.onward, id=message.id)])
 
     def wrap_tool_call(
         self, request: Any, handler: Callable[[Any], ToolMessage | Command[Any]]
@@ -96,32 +97,29 @@ class JesMiddleware(AgentMiddleware):
         def refuse(text: str) -> ToolMessage:
             return ToolMessage(content=text, tool_call_id=call["id"], name=name)
 
-        checked = self._record(
-            f"tool_call {name}", self.guard.check_tool_call(name, call["args"], prompt=prompt)
-        )
+        checked = self.guard.check_tool_call(name, call["args"], prompt=prompt)
+        self._record(f"tool_call {name}", checked)
         if not checked.ok:
             return refuse(checked.onward)
         subagent = call["args"].get("subagent_type")
         if name == "task" and self.subagents is not None and subagent not in self.subagents:
             return refuse("Refused: that subagent is not guarded.")
 
-        self.ran.append(name)
+        self.tools_called.append(name)
         outcome = handler(request)
         # Deep Agents' task tool returns a Command; its last message is the report.
         message = outcome.update["messages"][-1] if isinstance(outcome, Command) else outcome
         if not isinstance(message, ToolMessage):
             return refuse("Tool result refused: unexpected type.")
-        result = self._record(
-            f"tool_result {name}",
-            self.guard.check_tool_result(message.text, name=name, prompt=prompt),
-        )
+        result = self.guard.check_tool_result(message.text, name=name, prompt=prompt)
+        self._record(f"tool_result {name}", result)
         if not result.ok or result.onward != message.text:
-            # Blocked or redacted: the model sees onward, never the raw result.
+            # Blocked or redacted: the model gets onward instead of the raw result.
             return refuse(result.onward)
         # A Command could carry more state than the report; pass on only what was checked.
         return Command(update={"messages": [message]}) if isinstance(outcome, Command) else outcome
 
-    def _prompt(self, messages: list[Any]) -> Any:
+    def _prompt(self, messages: list[Any]) -> InputResult | str:
         """This turn's checked input, else the latest user message."""
 
         if self.incoming is not None:

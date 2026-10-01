@@ -1,7 +1,7 @@
 """Lesson 10 (local): When the decision model fails.
 
 on_backend_error picks what a failed check does: raise, block, or allow.
-max_input_bytes blocks oversized text before any model call. Prints each case.
+max_input_bytes blocks oversized text before any model call.
 
 Run:   uv run --group examples python -m examples.10_failures.local
 Needs: nothing (the backend is down on purpose)
@@ -9,39 +9,39 @@ Needs: nothing (the backend is down on purpose)
 
 from langchain_typesafe import TypeSafeClassifier
 
-from examples._common import Check, show
+from examples._common import print_check
 from jes import Guard
 from jes.errors import BackendError
 from jes.policies import injection
-from jes.types import InputResult
 
 # Nothing listens on port 9, so every check fails like a backend that is down.
 MODEL = TypeSafeClassifier(model="tev1", base_url="http://localhost:9", api_key="ollama", timeout=5)
-THRESHOLD = 0.5  # tev1 scores sit in a narrower band; lesson 01 explains it.
+THRESHOLD = 0.5
 POLICIES = [injection(threshold=THRESHOLD)]
 
 
-def main() -> tuple[str, InputResult, InputResult, InputResult]:
-    # raise (the default): check_input raises BackendError. Fail closed, loudly.
+def main() -> None:
+    print("== raise (the default)")
     try:
         Guard(POLICIES, model=MODEL, on_backend_error="raise").check_input("hello")
-        raised = "no error"
-    except BackendError:
-        raised = "raised"
+    except BackendError as error:
+        print(f"  BackendError: {error}")
 
-    # complete=False means some question went unanswered, so the text was not fully checked.
-    # block: decision is "block", so nothing goes on while the backend is down.
+    # complete=False means the text was not fully checked.
+    print("== block")
     blocked = Guard(POLICIES, model=MODEL, on_backend_error="block").check_input("hello")
-    # allow: decision is "allow" but complete=False and ok=False, so your code decides what to do.
-    opened = Guard(POLICIES, model=MODEL, on_backend_error="allow").check_input("hello")
+    print_check("input", blocked)
+    print(f"  complete={blocked.complete} ok={blocked.ok}")
 
-    # Text longer than max_input_bytes is blocked before any model call.
+    # The decision is "allow", but ok is False, so your code chooses what to do.
+    print("== allow")
+    allowed = Guard(POLICIES, model=MODEL, on_backend_error="allow").check_input("hello")
+    print_check("input", allowed)
+    print(f"  complete={allowed.complete} ok={allowed.ok}")
+
+    print("== byte cap")
     capped = Guard(POLICIES, model=MODEL, max_input_bytes=4).check_input("too long for the cap")
-
-    print(f"== raise\n  {raised}")
-    for name, result in (("block", blocked), ("allow", opened), ("byte cap", capped)):
-        show(name, [Check(f"input complete={result.complete}", result)])
-    return raised, blocked, opened, capped
+    print_check("input", capped)
 
 
 if __name__ == "__main__":

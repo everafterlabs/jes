@@ -1,32 +1,25 @@
 """Lesson 07 (Jev): Ask your own question with judge().
 
 judge() turns a question into a policy: a yes/no, a pick-one choice, or a
-graded score. Prints each of the three messages as blocked, with its score.
+graded score.
 
 Run:   uv run --group examples python -m examples.07_custom_questions.jev
 Needs: TYPESAFE_API_KEY
 """
 
-from examples._common import Check, require_env, show
+from examples._common import print_check, require_env
 from jes import Guard
 from jes.policies import judge
 from jes.questions import Choice, Score, YesNo
-from jes.types import InputResult
 
-# Hosted Jev. Pin a release such as "jev-1.13.0" in production.
 MODEL = "jev-latest"
-THRESHOLD = 0.72  # An application choice; lesson 01 explains it.
-
-REFUND = "Please refund the order."
-CHARGED_TWICE = "I was charged twice."
-OUTAGE = "The service is down for everyone."
+THRESHOLD = 0.72
 
 
-def main() -> tuple[InputResult, InputResult, InputResult]:
-    # judge(name, question) makes a policy. A yes/no blocks when P(yes) >= THRESHOLD.
+def main() -> None:
+    # Blocks when P(yes) >= THRESHOLD.
     refund = judge("refund", YesNo("The text asks for money back."), threshold=THRESHOLD)
-    # violating= lists the choices that count as a violation; their summed
-    # probability is compared with THRESHOLD.
+    # Blocks when the summed probability of the violating choices >= THRESHOLD.
     route = judge(
         "route",
         Choice(
@@ -35,8 +28,7 @@ def main() -> tuple[InputResult, InputResult, InputResult]:
         threshold=THRESHOLD,
         violating=["billing"],
     )
-    # violation_level=2 means level index 2 ("high") and above is a violation;
-    # the summed probability of those levels is compared with THRESHOLD.
+    # Blocks when the summed probability of level 2 ("high") and above >= THRESHOLD.
     severity = judge(
         "severity",
         Score("How severe is this?", ("low", "mid", "high")),
@@ -44,14 +36,12 @@ def main() -> tuple[InputResult, InputResult, InputResult]:
         violation_level=2,
     )
 
-    asks_refund = Guard([refund], model=MODEL).check_input(REFUND)
-    billing = Guard([route], model=MODEL).check_input(CHARGED_TWICE)
-    outage = Guard([severity], model=MODEL).check_input(OUTAGE)
-
-    show("refund", [Check("input", asks_refund)])
-    show("route", [Check("input", billing)])
-    show("severity", [Check("input", outage)])
-    return asks_refund, billing, outage
+    print("== custom questions")
+    print_check("refund", Guard([refund], model=MODEL).check_input("Please refund the order."))
+    print_check("route", Guard([route], model=MODEL).check_input("I was charged twice."))
+    print_check(
+        "severity", Guard([severity], model=MODEL).check_input("The service is down for everyone.")
+    )
 
 
 if __name__ == "__main__":
