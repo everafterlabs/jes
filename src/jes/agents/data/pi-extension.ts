@@ -1,4 +1,4 @@
-// Calls `uvx jes hook` on stdin. uvx ships with uv, so there is no separate jes install.
+// Checks each step with jes through ./jes-runner.ts, which `jes runner-settings` prints.
 // before_agent_start checks the user prompt and injects the refusal when it
 // is blocked. tool_call returns block: true. tool_result replaces content.
 import { sessionOf, spawnJes, type JesRunner } from "./jes-runner.ts";

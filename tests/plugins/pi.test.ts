@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import jesExtension from "../../src/jes/data/pi-extension.ts";
+import jesExtension from "../../src/jes/agents/data/pi-extension.ts";
 
 type Handler = (event: Record<string, unknown>, ctx: { sessionId?: string }) => unknown;
 

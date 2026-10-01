@@ -1,4 +1,5 @@
 {
+  "model": "jev-latest",
   "guards": {
     "injection": {
       "enabled": true,

@@ -8,11 +8,6 @@
 # Hermes does not reject the user message.
 # Shell hooks cannot replace a tool result or the assistant reply.
 
-limits:
-  - "pre_tool_call: a failed check prints action block and exits 2. Set fail_closed so a crashed hook does not allow the call."
-  - "pre_llm_call: a blocked user message is injected as context. Hermes does not reject the user message."
-  - "Shell hooks cannot replace a tool result or the assistant reply."
-
 hooks:
   pre_llm_call:
     - command: uvx jes@__JES_VERSION__ hermes-hook

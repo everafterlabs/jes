@@ -52,8 +52,11 @@ class Reply:
 
 @runtime_checkable
 class Backend(Protocol):
-    name: str
-    model: str
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def model(self) -> str: ...
 
     def headroom(self, state: State, questions: Mapping[str, Question]) -> int | None:
         """Bytes left in a request for this state and these questions. None means no limit."""

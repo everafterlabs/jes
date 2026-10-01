@@ -96,9 +96,14 @@ class TransformOutcome:
 class Transform(Protocol):
     """A local policy. It runs in its phase, in list order, on text from its stages."""
 
-    name: str
-    stages: frozenset[Stage]
-    phase: Phase
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def stages(self) -> frozenset[Stage]: ...
+
+    @property
+    def phase(self) -> Phase: ...
 
     def apply(self, text: str, context: TransformContext) -> TransformOutcome: ...
 

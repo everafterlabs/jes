@@ -1,4 +1,4 @@
-// Calls `uvx jes hook` on stdin. uvx ships with uv, so there is no separate jes install.
+// Checks each step with jes through ./jes-runner.ts, which `jes runner-settings` prints.
 // OpenCode has no display-only reply hook, so this plugin does not rewrite
 // the assistant reply. It checks the user prompt, the tool call, and the
 // tool result. A blocked tool result replaces output.output with onward.

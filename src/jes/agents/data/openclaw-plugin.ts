@@ -1,4 +1,4 @@
-// Calls `uvx jes hook` on stdin. uvx ships with uv, so there is no separate jes install.
+// Checks each step with jes through ./jes-runner.ts, which `jes runner-settings` prints.
 // before_agent_run blocks the user prompt. before_tool_call blocks the call.
 // tool_result_persist puts onward in content. message_sending rewrites the
 // reply that is about to be delivered.

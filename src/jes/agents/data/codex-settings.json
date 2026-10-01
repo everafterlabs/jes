@@ -1,9 +1,4 @@
 {
-  "limits": [
-    "PostToolUse fires after the tool has already run. decision block replaces the model-facing result with the refusal. It does not undo the command.",
-    "Stop checks the assistant reply and continues the turn with the refusal. It does not change text already on screen. A second Stop with stop_hook_active is skipped so a refusal does not loop.",
-    "Codex ignores a hook until you trust its exact text."
-  ],
   "hooks": {
     "UserPromptSubmit": [
       {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import register from "../../src/jes/data/openclaw-plugin.ts";
+import register from "../../src/jes/agents/data/openclaw-plugin.ts";
 
 type Handler = (event: Record<string, unknown>, ctx: { sessionId?: string }) => unknown;
 

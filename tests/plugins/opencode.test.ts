@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { createJesGuard } from "../../src/jes/data/opencode-plugin.ts";
+import { createJesGuard } from "../../src/jes/agents/data/opencode-plugin.ts";
 
 function recording(ok: boolean, onward: string) {
   const calls: Record<string, unknown>[] = [];

@@ -37,7 +37,7 @@ Repository = "https://github.com/everafterlabs/jes"
 Issues = "https://github.com/everafterlabs/jes/issues"
 
 [project.scripts]
-jes = "jes.cli:main"
+jes = "jes.agents.cli:main"
 
 [dependency-groups]
 # The runnable lessons in examples/. Live runs: uv run --frozen --group examples

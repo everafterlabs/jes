@@ -358,6 +358,9 @@ class Pipeline:
             plan.complete = False
             return plan
         stage = prepared.check.stage
+        context = prepared.context
+        # Without any context, every context mode sends the same request, so they share one.
+        bare = not (context.prompt or context.question or context.sources or context.history)
         groups: dict[tuple[int, str, bool, bool], list[tuple[Judgment, Backend]]] = {}
         item_judgments: list[tuple[Judgment, Backend]] = []
         for judgment, backend in self.judgments:
@@ -366,7 +369,8 @@ class Pipeline:
             if judgment.items is not None:
                 item_judgments.append((judgment, backend))
                 continue
-            key = (id(backend), judgment.context, judgment.sources, judgment.whole_text)
+            mode = "none" if bare else judgment.context
+            key = (id(backend), mode, judgment.sources and not bare, judgment.whole_text)
             groups.setdefault(key, []).append((judgment, backend))
         for group in groups.values():
             self._plan_text(prepared, group, plan)
