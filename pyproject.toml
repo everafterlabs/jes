@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "jes"
-version = "1.0.5"
+version = "2.0.0"
 description = "jes is a security toolkit for AI agents"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -40,7 +40,7 @@ Issues = "https://github.com/everafterlabs/jes/issues"
 jes = "jes.agents.cli:main"
 
 [dependency-groups]
-# The runnable lessons in examples/. Live runs: uv run --frozen --group examples
+# The runnable lessons in examples/: uv run --group examples python -m examples.<lesson>.jev
 examples = [
   "deepagents>=0.7.21,<0.8",
   "langchain>=1.4.3,<2",
@@ -106,11 +106,10 @@ reportMissingTypeStubs = "none"
 reportPrivateUsage = "none"
 
 [tool.pytest.ini_options]
-addopts = "-m \"not live\" --strict-config --strict-markers --cov=jes --cov-report=term-missing --cov-branch"
+addopts = "--strict-config --strict-markers --cov=jes --cov-report=term-missing --cov-branch"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["src", "."]
-markers = ["live: calls real APIs (Jev, OpenAI, Tavily, Ollama); run with -m live"]
 
 [tool.coverage.run]
 branch = true
