@@ -1,59 +1,44 @@
-"""jes public API."""
+"""jes: guardrails for AI agents."""
 
 from __future__ import annotations
 
-from jes._engine import AsyncGuard, Guard
+from importlib.metadata import PackageNotFoundError, version
+
 from jes.errors import (
     BackendError,
+    ConfigError,
     DeadlineExceeded,
+    JesError,
     PolicyError,
     PolicyExecutionError,
     RedactionError,
 )
+from jes.limits import Limits
 from jes.questions import Choice, Score, Threshold, YesNo
-from jes.redactions import Redactions
-from jes.types import (
-    Finding,
-    FindingLocation,
-    History,
-    InputResult,
-    Message,
-    Provenance,
-    ScanResult,
-    ScoreResult,
-    Span,
-    State,
-    ThresholdProvenance,
-    Timings,
-    Usage,
-)
+from jes.types import Finding, Message, ScoreResult, Span, Stage, Usage
 
-__version__ = "1.0.5"
+try:
+    __version__ = version("jes")
+except PackageNotFoundError:  # pragma: no cover - only when run from an uninstalled tree
+    __version__ = "0+unknown"
 
 __all__ = [
-    "AsyncGuard",
     "BackendError",
     "Choice",
+    "ConfigError",
     "DeadlineExceeded",
     "Finding",
-    "FindingLocation",
-    "Guard",
-    "History",
-    "InputResult",
+    "JesError",
+    "Limits",
     "Message",
     "PolicyError",
     "PolicyExecutionError",
-    "Provenance",
     "RedactionError",
-    "Redactions",
-    "ScanResult",
     "Score",
     "ScoreResult",
     "Span",
-    "State",
+    "Stage",
     "Threshold",
-    "ThresholdProvenance",
-    "Timings",
     "Usage",
     "YesNo",
     "__version__",

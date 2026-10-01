@@ -1,3 +1,5 @@
+"""Questions, answers, thresholds, and violation scores."""
+
 from __future__ import annotations
 
 import math
@@ -13,90 +15,112 @@ from jes.questions import (
     Threshold,
     YesNo,
     YesNoAnswer,
-    validate_answer,
     violation_score,
 )
 
 
-def test_yesno_rejects_empty_instructions() -> None:
-    with pytest.raises(PolicyError):
-        YesNo("   ")
+def test_questions_validate_their_shape() -> None:
+    with pytest.raises(PolicyError, match="instructions"):
+        YesNo("  ")
+    with pytest.raises(PolicyError, match="two options"):
+        Choice("Pick one.", {"only": None})
+    with pytest.raises(PolicyError, match="choice label"):
+        Choice("Pick one.", {"ok": None, "not ok": None})
+    with pytest.raises(PolicyError, match="between 2 and 10"):
+        Score("Rate it.", ("only",))
+    with pytest.raises(PolicyError, match="unique"):
+        Score("Rate it.", ("low", "low"))
+    with pytest.raises(PolicyError, match="unique and non-empty"):
+        Score("Rate it.", ("low", " "))
 
 
-def test_choice_requires_two_options_and_valid_labels() -> None:
-    with pytest.raises(PolicyError):
-        Choice("pick", {"only": None})
-    with pytest.raises(PolicyError):
-        Choice("pick", {"1bad": None, "ok": None})
-    question = Choice("pick", {"safe": None, "bad": "harmful"})
-    assert question.top if False else set(question.options) == {"safe", "bad"}
+def test_choice_options_are_frozen() -> None:
+    options = {"billing": "Money problems", "other": None}
+    question = Choice("Which team?", options)
+    options["billing"] = "changed"
+    assert question.options["billing"] == "Money problems"
+    with pytest.raises(TypeError):
+        question.options["other"] = "x"  # type: ignore[index]
 
 
-def test_score_level_bounds() -> None:
-    with pytest.raises(PolicyError):
-        Score("rate", ("a",))
-    with pytest.raises(PolicyError):
-        Score("rate", tuple(str(index) for index in range(11)))
-    with pytest.raises(PolicyError):
-        Score("rate", ("low", "low"))
+def test_answers_must_be_probabilities() -> None:
+    for bad in (-0.1, 1.1, math.nan, math.inf, True):
+        with pytest.raises(BackendError):
+            YesNoAnswer(bad)  # type: ignore[arg-type]
+    with pytest.raises(BackendError, match="confidence"):
+        YesNoAnswer(0.5, confidence=2.0)
+    with pytest.raises(BackendError, match="sum to one"):
+        ChoiceAnswer({"a": 0.5, "b": 0.2})
+    with pytest.raises(BackendError, match="numbers"):
+        ChoiceAnswer({})
+    with pytest.raises(BackendError, match="sum to one"):
+        ScoreAnswer((0.1, 0.1))
+    with pytest.raises(BackendError, match="numbers"):
+        ScoreAnswer(())
+    assert ChoiceAnswer({"a": 0.5004, "b": 0.5}).scores["a"] == 0.5004
 
 
-def test_answers_reject_non_finite_and_boolean() -> None:
-    with pytest.raises(BackendError):
-        YesNoAnswer(True, "probability")  # type: ignore[arg-type]
-    with pytest.raises(BackendError):
-        YesNoAnswer(math.nan, "probability")
-    with pytest.raises(BackendError):
-        ChoiceAnswer({"a": 0.5, "b": 0.4}, "probability")
-    with pytest.raises(BackendError):
-        ScoreAnswer((0.5, 0.6), "probability")
+def test_threshold_bounds_and_coercion() -> None:
+    assert Threshold.coerce(0.5) == Threshold(block_at=0.5)
+    existing = Threshold(0.8, flag_at=0.4)
+    assert Threshold.coerce(existing) is existing
+    assert isinstance(Threshold(1).block_at, float)
+    for bad in (True, -0.1, 1.5, math.nan):
+        with pytest.raises(PolicyError, match="block_at"):
+            Threshold.coerce(bad)  # type: ignore[arg-type]
+    with pytest.raises(PolicyError, match="flag_at must be"):
+        Threshold(0.5, flag_at=2.0)
+    with pytest.raises(PolicyError, match="not be above"):
+        Threshold(0.5, flag_at=0.6)
 
 
-def test_choice_top_and_score_expected_level() -> None:
-    choice = ChoiceAnswer({"safe": 0.2, "bad": 0.8}, "probability")
-    assert choice.top == "bad"
-    score = ScoreAnswer((0.0, 0.5, 0.5), "probability")
-    assert score.expected_level == 1.5
+def test_threshold_action() -> None:
+    threshold = Threshold(0.8, flag_at=0.5)
+    assert threshold.action(0.9) == "block"
+    assert threshold.action(0.8) == "block"
+    assert threshold.action(0.5) == "flag"
+    assert threshold.action(0.49) is None
+    assert Threshold(0.8).action(0.79) is None
 
 
-def test_validate_answer_and_violation_score() -> None:
-    yes = YesNo("bad?")
-    choice = Choice("pick", {"safe": None, "bad": None})
-    score = Score("rate", ("low", "high"))
-    validate_answer(yes, YesNoAnswer(0.9, "probability"))
-    with pytest.raises(BackendError):
-        validate_answer(yes, ChoiceAnswer({"safe": 0.5, "bad": 0.5}, "probability"))
-    with pytest.raises(BackendError):
-        validate_answer(choice, ChoiceAnswer({"other": 1.0}, "probability"))
-    with pytest.raises(BackendError):
-        validate_answer(score, ScoreAnswer((1.0,), "probability"))
-    assert violation_score(yes, YesNoAnswer(0.4, "probability")) == 0.4
-    assert (
-        violation_score(
-            choice,
-            ChoiceAnswer({"safe": 0.55, "bad": 0.45}, "probability"),
-            violating={"bad"},
-        )
-        == 0.45
-    )
-    assert (
-        violation_score(
-            score,
-            ScoreAnswer((0.2, 0.8), "probability"),
-            violation_level=1,
-        )
-        == 0.8
-    )
-    with pytest.raises(PolicyError):
-        violation_score(choice, ChoiceAnswer({"safe": 0.5, "bad": 0.5}, "probability"))
+def test_violation_score_for_each_question_type() -> None:
+    assert violation_score(YesNo("Bad?"), YesNoAnswer(0.7)) == 0.7
+
+    choice = Choice("Which team?", {"billing": None, "refunds": None, "other": None})
+    answer = ChoiceAnswer({"billing": 0.5, "refunds": 0.3, "other": 0.2})
+    assert violation_score(choice, answer, violating=["billing", "refunds"]) == pytest.approx(0.8)
+    assert violation_score(choice, answer, violating=["billing", "billing"]) == 0.5
+
+    score = Score("How severe?", ("low", "mid", "high"))
+    levels = ScoreAnswer((0.2, 0.3, 0.5))
+    assert violation_score(score, levels, violation_level=1) == pytest.approx(0.8)
+    assert violation_score(score, levels, violation_level=0) == pytest.approx(1.0)
 
 
-def test_threshold_validation() -> None:
-    with pytest.raises(PolicyError):
-        Threshold(block_at=True)  # type: ignore[arg-type]
-    with pytest.raises(PolicyError):
-        Threshold(block_at=1.2)
-    with pytest.raises(PolicyError):
-        Threshold(block_at=0.2, flag_at=0.5)
-    assert Threshold.coerce(0.8).block_at == 0.8
-    assert Threshold.coerce(Threshold(0.3)).block_at == 0.3
+def test_violation_score_never_exceeds_one() -> None:
+    choice = Choice("Pick.", {"a": None, "b": None})
+    answer = ChoiceAnswer({"a": 0.6, "b": 0.4009})
+    assert violation_score(choice, answer, violating=["a", "b"]) == 1.0
+
+
+def test_violation_score_rejects_mismatches() -> None:
+    choice = Choice("Pick.", {"a": None, "b": None})
+    with pytest.raises(PolicyError, match="non-empty subset"):
+        violation_score(choice, ChoiceAnswer({"a": 0.5, "b": 0.5}))
+    with pytest.raises(PolicyError, match="non-empty subset"):
+        violation_score(choice, ChoiceAnswer({"a": 0.5, "b": 0.5}), violating=["c"])
+    with pytest.raises(BackendError, match="labels do not match"):
+        violation_score(choice, ChoiceAnswer({"a": 0.5, "c": 0.5}), violating=["a"])
+
+    score = Score("Rate.", ("low", "high"))
+    with pytest.raises(PolicyError, match="violation_level"):
+        violation_score(score, ScoreAnswer((0.5, 0.5)))
+    with pytest.raises(PolicyError, match="violation_level"):
+        violation_score(score, ScoreAnswer((0.5, 0.5)), violation_level=2)
+    with pytest.raises(PolicyError, match="violation_level"):
+        violation_score(score, ScoreAnswer((0.5, 0.5)), violation_level=True)
+    with pytest.raises(BackendError, match="length"):
+        violation_score(score, ScoreAnswer((0.2, 0.3, 0.5)), violation_level=1)
+
+    with pytest.raises(BackendError, match="answer type"):
+        violation_score(YesNo("Bad?"), ScoreAnswer((0.5, 0.5)))
