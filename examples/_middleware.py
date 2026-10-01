@@ -17,7 +17,7 @@ so one agent can serve many conversations at once.
 from __future__ import annotations
 
 from collections.abc import Callable, Container
-from typing import Any, NotRequired
+from typing import Annotated, Any, NotRequired
 
 from langchain.agents.middleware import (
     AgentMiddleware,
@@ -26,6 +26,7 @@ from langchain.agents.middleware import (
     ModelResponse,
     hook_config,
 )
+from langchain.agents.middleware.types import PrivateStateAttr
 from langchain.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.runtime import Runtime
 from langgraph.types import Command
@@ -37,7 +38,9 @@ from jes import Guard, Result
 class JesState(AgentState):
     """The agent's state, plus this turn's checked user message."""
 
-    jes_input: NotRequired[Result]
+    # Private: each agent checks its own input. It also keeps the Result (whose
+    # redaction store can't be copied) out of the Command a subagent returns.
+    jes_input: NotRequired[Annotated[Result, PrivateStateAttr]]
 
 
 class JesMiddleware(AgentMiddleware[JesState]):
