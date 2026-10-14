@@ -50,7 +50,7 @@ examples = [
   "langgraph>=1.2.12,<2",
   "ollama>=0.6.3,<0.7",
   "openai>=3.22.1,<4",
-  "openai-agents>=0.22.3,<0.23",
+  "openai-agents>=0.22.3,<0.24",
   "tavily-python>=0.8.4,<0.9",
 ]
 dev = [
